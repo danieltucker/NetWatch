@@ -134,10 +134,24 @@ function SparkTooltip({ active, payload, coordinate, containerRef }) {
 // Down-event dot on sparkline
 // ---------------------------------------------------------------------------
 
-const SparkDot = ({ cx, cy, payload, index }) => {
+const SparkDot = ({ cx, cy, payload, index, onZoom }) => {
   if (!cx || !cy) return null;
   if (payload?.status === 'down') {
-    return <circle key={`d-${index}`} cx={cx} cy={cy} r={3} fill="#ef4444" />;
+    return (
+      <g key={`d-${index}`}>
+        {onZoom && (
+          // Larger transparent hit area for easy clicking on mobile/desktop
+          <circle
+            cx={cx} cy={cy} r={10}
+            fill="transparent"
+            style={{ cursor: 'crosshair' }}
+            title="Zoom to this incident"
+            onClick={e => { e.stopPropagation(); onZoom(payload.timestamp); }}
+          />
+        )}
+        <circle cx={cx} cy={cy} r={3} fill="#ef4444" style={{ pointerEvents: 'none' }} />
+      </g>
+    );
   }
   return <circle key={`u-${index}`} cx={cx} cy={cy} r={0} fill="none" />;
 };
@@ -276,6 +290,7 @@ function MonitorCardInner({
   monitor, onEdit, onCardClick, compact = false,
   dragHandleProps, isDragging = false,
   chartYMax = 'auto',
+  onZoomToPoint,
 }) {
   const { t, isDark } = useTheme();
   const chartRef = useRef(null);
@@ -284,6 +299,13 @@ function MonitorCardInner({
   const tooltipContent = useMemo(
     () => (props) => <SparkTooltip {...props} containerRef={chartRef} />,
     []
+  );
+
+  // Memoised dot renderer — closes over onZoomToPoint so Recharts re-uses it
+  // without triggering unnecessary chart re-renders.
+  const dotRenderer = useMemo(
+    () => (props) => <SparkDot {...props} onZoom={onZoomToPoint} />,
+    [onZoomToPoint]
   );
 
   const chartData = monitor.history.map((h, i) => ({
@@ -354,7 +376,7 @@ function MonitorCardInner({
                   <Area type="monotone" dataKey="ping"
                     stroke={lineColor} strokeWidth={1.5}
                     fill={`url(#${gradientId})`}
-                    dot={<SparkDot />}
+                    dot={dotRenderer}
                     activeDot={{ r: 3, fill: lineColor, strokeWidth: 0 }}
                     isAnimationActive={false}
                   />
@@ -427,12 +449,23 @@ function MonitorCardInner({
 
       {/* ── Target row ── */}
       <div className="px-4 pb-3">
-        <span className="text-xs font-mono truncate block" style={{ color: t.textMuted }}>
-          {monitor.target}
-          {monitor.port && (
-            <span style={{ color: t.textFaint }}>:{monitor.port}</span>
-          )}
-        </span>
+        {(monitor.checkType === 'http' || monitor.checkType === 'api') ? (
+          <a
+            href={monitor.target.startsWith('http') ? monitor.target : `https://${monitor.target}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            className="text-xs font-mono truncate block hover:underline"
+            style={{ color: t.textMuted }}>
+            {monitor.target}
+            {monitor.port && <span style={{ color: t.textFaint }}>:{monitor.port}</span>}
+          </a>
+        ) : (
+          <span className="text-xs font-mono truncate block" style={{ color: t.textMuted }}>
+            {monitor.target}
+            {monitor.port && <span style={{ color: t.textFaint }}>:{monitor.port}</span>}
+          </span>
+        )}
         {monitor.description && (
           <span className="text-xs font-mono truncate block mt-0.5" style={{ color: t.textFaint }}>
             {monitor.description}
@@ -543,8 +576,9 @@ function MonitorCardInner({
 }
 
 export const MonitorCard = React.memo(MonitorCardInner, (prev, next) =>
-  prev.monitor    === next.monitor    &&
-  prev.chartYMax  === next.chartYMax  &&
-  prev.isDragging === next.isDragging &&
-  prev.compact    === next.compact
+  prev.monitor       === next.monitor       &&
+  prev.chartYMax     === next.chartYMax     &&
+  prev.isDragging    === next.isDragging    &&
+  prev.compact       === next.compact       &&
+  prev.onZoomToPoint === next.onZoomToPoint
 );

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Radio, Activity, AlertTriangle, Bell, Tag as TagIcon, Settings, Code, X, Menu } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Plus, Radio, Activity, AlertTriangle, Bell, Tag as TagIcon, Settings, Code, X, Menu, Search, Zap } from 'lucide-react';
 import {
   DndContext, closestCenter,
   KeyboardSensor, PointerSensor,
@@ -30,7 +30,7 @@ import { moduleRegistry }      from './modules/index.js';
 
 // ── Sortable card wrapper ─────────────────────────────────────────────────────
 
-function SortableMonitorCard({ monitor, onEdit, onCardClick, width, sortEnabled, chartYMax }) {
+function SortableMonitorCard({ monitor, onEdit, onCardClick, onZoomToPoint, width, sortEnabled, chartYMax }) {
   const id = String(monitor.id);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
@@ -48,6 +48,7 @@ function SortableMonitorCard({ monitor, onEdit, onCardClick, width, sortEnabled,
         monitor={monitor}
         onEdit={onEdit}
         onCardClick={onCardClick}
+        onZoomToPoint={onZoomToPoint}
         dragHandleProps={sortEnabled ? { ...attributes, ...listeners } : undefined}
         isDragging={isDragging}
         chartYMax={chartYMax}
@@ -56,8 +57,10 @@ function SortableMonitorCard({ monitor, onEdit, onCardClick, width, sortEnabled,
   );
 }
 
-const HISTORY_OPTIONS = [
+const HISTORY_PRESETS = [
+  { label: '15m', value: '15m' },
   { label: '1h',  value: '1h'  },
+  { label: '6h',  value: '6h'  },
   { label: '12h', value: '12h' },
   { label: '1d',  value: '1d'  },
   { label: '1w',  value: '1w'  },
@@ -65,9 +68,18 @@ const HISTORY_OPTIONS = [
 ];
 
 const SORT_OPTIONS = [
-  { label: 'Default',  value: 'default' },
-  { label: 'Uptime',   value: 'uptime'  },
-  { label: 'Avg Ping', value: 'ping'    },
+  { label: 'Default', value: 'default' },
+  { label: 'Status',  value: 'status'  },
+  { label: 'Uptime',  value: 'uptime'  },
+  { label: 'Name',    value: 'name'    },
+  { label: 'Slowest', value: 'ping'    },
+];
+
+const STATUS_FILTER_OPTS = [
+  { label: 'All',      value: 'all',      dot: null      },
+  { label: 'Down',     value: 'down',     dot: '#ef4444' },
+  { label: 'Degraded', value: 'degraded', dot: '#f59e0b' },
+  { label: 'Up',       value: 'up',       dot: '#4ade80' },
 ];
 
 // ── App ───────────────────────────────────────────────────────────────────────
@@ -75,14 +87,52 @@ const SORT_OPTIONS = [
 export default function App() {
   const { isDark, t } = useTheme();
 
-  const [historyWindow,  setHistoryWindow]  = useState(() => {
-    try { return localStorage.getItem('wt-history-window') || '1h'; }
-    catch { return '1h'; }
+  // One-time migration: move wt- prefixed keys to nw- on first load
+  useEffect(() => {
+    try {
+      const oldWindow = localStorage.getItem('wt-history-window');
+      if (oldWindow && !localStorage.getItem('nw-history-window')) {
+        localStorage.setItem('nw-history-window', oldWindow);
+        localStorage.removeItem('wt-history-window');
+      }
+      const oldYMax = localStorage.getItem('wt-chart-y-max');
+      if (oldYMax && !localStorage.getItem('nw-chart-y-max')) {
+        localStorage.setItem('nw-chart-y-max', oldYMax);
+        localStorage.removeItem('wt-chart-y-max');
+      }
+    } catch {}
+  }, []);
+
+  // historyRange: { type:'preset', value:'1h' }
+  //             | { type:'custom', from:ISO, to:ISO }
+  //             | { type:'zoom',   from:ISO, to:ISO, incidentAt:ISO }
+  const [historyRange, setHistoryRange] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nw-history-range');
+      if (saved) { const p = JSON.parse(saved); if (p.type === 'preset') return p; }
+      // Fall back to migrated window key
+      const w = localStorage.getItem('nw-history-window') || localStorage.getItem('wt-history-window');
+      if (w) return { type: 'preset', value: w };
+    } catch {}
+    return { type: 'preset', value: '1h' };
   });
 
-  const { monitors, loading, error, addMonitor, updateMonitor, deleteMonitor, refresh } = useMonitors(historyWindow);
+  // Derive a plain window string for cases that still need it (SSE comparison etc.)
+  const historyWindow = historyRange.type === 'preset' ? historyRange.value : 'custom';
 
-  const { alerts, dismiss: dismissAlert, dismissAll } = useAlerts();
+  const { monitors, loading, error, addMonitor, updateMonitor, deleteMonitor, refresh } =
+    useMonitors(historyWindow, historyRange);
+
+  const [alertsAutoOpen, setAlertsAutoOpen] = useState(() => {
+    try { return localStorage.getItem('nw-alerts-auto-open') || 'outage'; }
+    catch { return 'outage'; }
+  });
+
+  const { alerts, dismiss: dismissAlert, dismissAll } = useAlerts((alert) => {
+    if (alertsAutoOpen === 'never') return;
+    if (alertsAutoOpen === 'outage' && alert.type !== 'outage') return;
+    setShowAlerts(true);
+  });
   const { instances, addInstance, updateInstance, deleteInstance } = useModuleInstances();
 
   const [showForm,       setShowForm]       = useState(false);
@@ -95,6 +145,8 @@ export default function App() {
   const [instanceSubmitting, setInstanceSubmitting] = useState(false);
   const [instanceError,  setInstanceError]  = useState('');
   const [tagFilter,      setTagFilter]      = useState([]);
+  const [searchQuery,    setSearchQuery]    = useState('');
+  const [statusFilter,   setStatusFilter]   = useState('all');
   const [showAlerts,     setShowAlerts]     = useState(false);
   const [sortBy,         setSortBy]         = useState('default');
   const [showSettings,    setShowSettings]    = useState(false);
@@ -102,7 +154,7 @@ export default function App() {
   const [editingInstance, setEditingInstance] = useState(null);  // module instance being edited
   const [mobileMenuOpen,  setMobileMenuOpen]  = useState(false);
   const [chartYMax, setChartYMax] = useState(() => {
-    try { return localStorage.getItem('wt-chart-y-max') || 'auto'; }
+    try { return localStorage.getItem('nw-chart-y-max') || localStorage.getItem('wt-chart-y-max') || 'auto'; }
     catch { return 'auto'; }
   });
 
@@ -110,15 +162,24 @@ export default function App() {
 
   const handleChartYMaxChange = (val) => {
     setChartYMax(val);
-    try { localStorage.setItem('wt-chart-y-max', val); }
+    try { localStorage.setItem('nw-chart-y-max', val); }
     catch {}
   };
 
-  // ── Persist history window choice ─────────────────────────────────────────
+  // ── Persist preset history range choice ──────────────────────────────────
   useEffect(() => {
-    try { localStorage.setItem('wt-history-window', historyWindow); }
-    catch {}
-  }, [historyWindow]);
+    if (historyRange.type === 'preset') {
+      try { localStorage.setItem('nw-history-range', JSON.stringify(historyRange)); } catch {}
+    }
+  }, [historyRange]);
+
+  // ── Zoom to incident — sets global range ±30 min around a down-event ──────
+  const handleZoomToIncident = useCallback((timestamp) => {
+    const ms   = new Date(timestamp).getTime();
+    const from = new Date(ms - 30 * 60 * 1000).toISOString();
+    const to   = new Date(ms + 30 * 60 * 1000).toISOString();
+    setHistoryRange({ type: 'zoom', from, to, incidentAt: timestamp });
+  }, []);
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const userMonitors = monitors.filter(m => !m.tags?.includes('_ref'));
@@ -132,13 +193,43 @@ export default function App() {
     : userMonitors.filter(m => tagFilter.some(tag => m.tags?.includes(tag)));
 
   const filteredMonitors = (() => {
-    if (sortBy === 'uptime') {
-      return baseFiltered.slice().sort((a, b) =>
-        (a.uptimePercent ?? 100) - (b.uptimePercent ?? 100)
+    let list = baseFiltered;
+
+    // Text search
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(m =>
+        m.label.toLowerCase().includes(q) ||
+        m.target.toLowerCase().includes(q)
       );
     }
+
+    // Status filter
+    if (statusFilter === 'down') {
+      list = list.filter(m => m.status === 'down');
+    } else if (statusFilter === 'degraded') {
+      list = list.filter(m =>
+        m.status === 'degraded' ||
+        (m.status === 'up' && m.degradedThreshold != null &&
+         m.currentPing != null && m.currentPing > m.degradedThreshold)
+      );
+    } else if (statusFilter === 'up') {
+      list = list.filter(m => m.status === 'up');
+    }
+
+    // Sort
+    if (sortBy === 'status') {
+      const rank = { down: 0, degraded: 1, pending: 2, up: 3 };
+      return list.slice().sort((a, b) => (rank[a.status] ?? 2) - (rank[b.status] ?? 2));
+    }
+    if (sortBy === 'uptime') {
+      return list.slice().sort((a, b) => (a.uptimePercent ?? 100) - (b.uptimePercent ?? 100));
+    }
+    if (sortBy === 'name') {
+      return list.slice().sort((a, b) => a.label.localeCompare(b.label));
+    }
     if (sortBy === 'ping') {
-      return baseFiltered.slice().sort((a, b) => {
+      return list.slice().sort((a, b) => {
         if (a.currentPing == null && b.currentPing == null) return 0;
         if (a.currentPing == null) return 1;
         if (b.currentPing == null) return -1;
@@ -146,7 +237,7 @@ export default function App() {
       });
     }
     // 'default': apply saved manual order
-    return sortMonitors(baseFiltered);
+    return sortMonitors(list);
   })();
 
   // Drag-and-drop — only active in default sort mode
@@ -200,7 +291,7 @@ export default function App() {
       await addMonitor(data);
       closeForm();
     } catch (err) {
-      console.error('[watchtower] save failed:', err);
+      console.error('[netwatch] save failed:', err);
       setFormError(`Failed to save monitor: ${err.message}`);
     } finally {
       setSubmitting(false);
@@ -239,11 +330,11 @@ export default function App() {
           <div className="flex items-center gap-3">
             <Radio size={18} className="text-green-400" />
             <span className="font-mono font-bold tracking-[0.12em]" style={{ color: t.textPrimary }}>
-              WATCHTOWER
+              NETWATCH
             </span>
             <span className="hidden sm:inline text-xs font-mono px-2 py-0.5 rounded border"
               style={{ color: t.textFaint, borderColor: t.cardBorder }}>
-              watchtower · v5.3.1
+              netwatch · v6.0.0
             </span>
           </div>
 
@@ -380,62 +471,66 @@ export default function App() {
         {!loading && !error && (
           <>
 
-            {/* Tag filter + view controls row */}
-            <div className="flex items-center gap-2 flex-wrap">
-              {allTags.length > 0 && (
-                <>
-                  <span className="text-xs font-mono uppercase tracking-wider"
-                    style={{ color: t.textMuted }}>
-                    Filter
-                  </span>
-                  {allTags.map(tag => (
-                    <button key={tag} onClick={() => toggleTag(tag)}
-                      className="flex items-center gap-0.5 text-xs font-mono px-2 py-0.5 rounded border transition-colors"
-                      style={tagFilter.includes(tag)
-                        ? { color: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.15)', borderColor: 'rgba(96,165,250,0.4)' }
-                        : { color: t.textMuted, backgroundColor: t.tagBg, borderColor: t.tagBorder }
-                      }>
-                      <TagIcon size={9} />
-                      {tag}
-                    </button>
-                  ))}
-                  {tagFilter.length > 0 && (
-                    <button onClick={() => setTagFilter([])}
-                      className="text-xs font-mono transition-opacity opacity-50 hover:opacity-100"
-                      style={{ color: t.textSecondary }}>
-                      clear
-                    </button>
-                  )}
-                  <div className="w-px h-3 mx-1 shrink-0" style={{ backgroundColor: t.cardBorder }} />
-                </>
-              )}
+            {/* ── Tag filter row (only shown when tags exist) ──────────────── */}
+            {allTags.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-mono uppercase tracking-wider"
+                  style={{ color: t.textMuted }}>
+                  Filter
+                </span>
+                {allTags.map(tag => (
+                  <button key={tag} onClick={() => toggleTag(tag)}
+                    className="flex items-center gap-0.5 text-xs font-mono px-2 py-0.5 rounded border transition-colors"
+                    style={tagFilter.includes(tag)
+                      ? { color: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.15)', borderColor: 'rgba(96,165,250,0.4)' }
+                      : { color: t.textMuted, backgroundColor: t.tagBg, borderColor: t.tagBorder }
+                    }>
+                    <TagIcon size={9} />
+                    {tag}
+                  </button>
+                ))}
+                {tagFilter.length > 0 && (
+                  <button onClick={() => setTagFilter([])}
+                    className="text-xs font-mono transition-opacity opacity-50 hover:opacity-100"
+                    style={{ color: t.textSecondary }}>
+                    clear
+                  </button>
+                )}
+              </div>
+            )}
 
-              {/* Window + Sort — always visible, unobtrusive */}
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1">
-                  <span className="text-xs font-mono" style={{ color: t.textFaint }}>Window</span>
-                  <select
-                    value={historyWindow}
-                    onChange={e => setHistoryWindow(e.target.value)}
-                    className="text-xs font-mono rounded border px-1.5 py-0.5 appearance-none cursor-pointer focus:outline-none"
-                    style={{ backgroundColor: t.inputBg, color: t.textSecondary, borderColor: t.cardBorder }}>
-                    {HISTORY_OPTIONS.map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-xs font-mono" style={{ color: t.textFaint }}>Sort</span>
-                  <select
-                    value={sortBy}
-                    onChange={e => setSortBy(e.target.value)}
-                    className="text-xs font-mono rounded border px-1.5 py-0.5 appearance-none cursor-pointer focus:outline-none"
-                    style={{ backgroundColor: t.inputBg, color: t.textSecondary, borderColor: t.cardBorder }}>
-                    {SORT_OPTIONS.map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
+            {/* ── Controls row ─────────────────────────────────────────────── */}
+            <div className="flex items-center gap-2 flex-wrap">
+
+              {/* Text search */}
+              <MonitorSearch value={searchQuery} onChange={setSearchQuery} t={t} />
+
+              {/* Status quick-filter */}
+              <StatusFilterGroup value={statusFilter} onChange={setStatusFilter} t={t} isDark={isDark} />
+
+              {/* Divider */}
+              <div className="w-px h-3 shrink-0 hidden sm:block" style={{ backgroundColor: t.cardBorder }} />
+
+              {/* History range (pills or active-range badge) */}
+              <HistoryRangeControl
+                historyRange={historyRange}
+                onChange={setHistoryRange}
+                t={t}
+                isDark={isDark}
+              />
+
+              {/* Sort — pushed to the right on wide screens */}
+              <div className="flex items-center gap-1 ml-auto">
+                <span className="text-xs font-mono" style={{ color: t.textFaint }}>Sort</span>
+                <select
+                  value={sortBy}
+                  onChange={e => setSortBy(e.target.value)}
+                  className="text-xs font-mono rounded border px-1.5 py-0.5 appearance-none cursor-pointer focus:outline-none"
+                  style={{ backgroundColor: t.inputBg, color: t.textSecondary, borderColor: t.cardBorder }}>
+                  {SORT_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -461,6 +556,7 @@ export default function App() {
                         monitor={m}
                         onEdit={mon => openDetail(mon, 'edit')}
                         onCardClick={mon => openDetail(mon, 'history')}
+                        onZoomToPoint={handleZoomToIncident}
                         width={getWidth(m.id)}
                         sortEnabled={sortEnabled}
                         chartYMax={chartYMax}
@@ -540,6 +636,11 @@ export default function App() {
           onClose={() => setShowSettings(false)}
           chartYMax={chartYMax}
           onChartYMaxChange={handleChartYMaxChange}
+          alertsAutoOpen={alertsAutoOpen}
+          onAlertsAutoOpenChange={(val) => {
+            setAlertsAutoOpen(val);
+            try { localStorage.setItem('nw-alerts-auto-open', val); } catch {}
+          }}
         />
       )}
 
@@ -590,6 +691,289 @@ export default function App() {
   );
 }
 
+// ── Toolbar sub-components ────────────────────────────────────────────────────
+
+function MonitorSearch({ value, onChange, t }) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Escape' && document.activeElement === ref.current) {
+        onChange('');
+        ref.current?.blur();
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onChange]);
+
+  return (
+    <div className="relative flex items-center shrink-0">
+      <Search size={11} className="absolute left-2 pointer-events-none"
+        style={{ color: t.textFaint }} />
+      <input
+        ref={ref}
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder="Search monitors…"
+        className="pl-6 py-0.5 text-xs font-mono rounded border focus:outline-none
+                   focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 transition-all"
+        style={{
+          width:           value ? 160 : 140,
+          paddingRight:    value ? '1.25rem' : '0.5rem',
+          backgroundColor: t.inputBg,
+          color:           t.textPrimary,
+          borderColor:     value ? 'rgba(96,165,250,0.5)' : t.cardBorder,
+          transition:      'width 0.15s, border-color 0.15s',
+        }}
+      />
+      {value && (
+        <button
+          onClick={() => onChange('')}
+          className="absolute right-1.5 opacity-50 hover:opacity-100 transition-opacity"
+          style={{ color: t.textMuted }}
+          title="Clear (Esc)">
+          <X size={10} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function StatusFilterGroup({ value, onChange, t, isDark }) {
+  return (
+    <div className="flex items-center shrink-0">
+      {STATUS_FILTER_OPTS.map((opt, i) => {
+        const isActive = value === opt.value;
+        const isFirst  = i === 0;
+        const isLast   = i === STATUS_FILTER_OPTS.length - 1;
+        const color    = opt.dot ?? '#60a5fa';
+        return (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            className="flex items-center gap-1 px-2 py-0.5 text-xs font-mono border transition-all"
+            style={{
+              borderRadius:    isFirst ? '0.375rem 0 0 0.375rem'
+                             : isLast  ? '0 0.375rem 0.375rem 0' : '0',
+              marginLeft:      i > 0 ? '-1px' : 0,
+              position:        'relative',
+              zIndex:          isActive ? 1 : 0,
+              backgroundColor: isActive
+                ? `${color}18`
+                : isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+              borderColor:     isActive ? color : t.cardBorder,
+              color:           isActive ? color : t.textMuted,
+            }}>
+            {opt.dot && (
+              <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
+                style={{ backgroundColor: opt.dot, opacity: isActive ? 1 : 0.45 }} />
+            )}
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function HistoryRangeControl({ historyRange, onChange, t, isDark }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [draftFrom,  setDraftFrom]  = useState('');
+  const [draftTo,    setDraftTo]    = useState('');
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const handler = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setPickerOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [pickerOpen]);
+
+  const isCustomActive = historyRange.type === 'custom' || historyRange.type === 'zoom';
+
+  const clearRange = () => onChange({ type: 'preset', value: '1h' });
+
+  const applyCustom = () => {
+    if (!draftFrom || !draftTo) return;
+    onChange({
+      type: 'custom',
+      from: new Date(draftFrom).toISOString(),
+      to:   new Date(draftTo).toISOString(),
+    });
+    setPickerOpen(false);
+  };
+
+  const formatActiveLabel = () => {
+    if (historyRange.type === 'zoom') {
+      const d = new Date(historyRange.incidentAt);
+      const s = d.toLocaleString('en-US', {
+        month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+      });
+      return { isZoom: true, text: `${s} ±30m` };
+    }
+    const from = new Date(historyRange.from);
+    const to   = new Date(historyRange.to);
+    const sameDay = from.toDateString() === to.toDateString();
+    const fStr = from.toLocaleString('en-US', {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+    });
+    const tStr = sameDay
+      ? to.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+      : to.toLocaleString('en-US', {
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+        });
+    return { isZoom: false, text: `${fStr} – ${tStr}` };
+  };
+
+  return (
+    <div className="relative flex items-center gap-1 shrink-0" ref={wrapRef}>
+      <span className="text-xs font-mono" style={{ color: t.textFaint }}>History</span>
+
+      {isCustomActive ? (
+        // Active range badge
+        (() => {
+          const { isZoom, text } = formatActiveLabel();
+          const color = isZoom ? '#f59e0b' : '#60a5fa';
+          const bg    = isZoom ? 'rgba(245,158,11,0.12)' : 'rgba(96,165,250,0.12)';
+          const border = isZoom ? 'rgba(245,158,11,0.35)' : 'rgba(96,165,250,0.35)';
+          return (
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs font-mono"
+              style={{ color, backgroundColor: bg, borderColor: border }}>
+              {isZoom && <Zap size={10} />}
+              <span>{text}</span>
+              <button
+                onClick={clearRange}
+                className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity"
+                title="Clear range">
+                <X size={10} />
+              </button>
+            </div>
+          );
+        })()
+      ) : (
+        // Preset pill group + Custom button
+        <div className="flex items-center">
+          {HISTORY_PRESETS.map((o, i) => {
+            const isActive = historyRange.type === 'preset' && historyRange.value === o.value;
+            const isFirst  = i === 0;
+            return (
+              <button
+                key={o.value}
+                onClick={() => { onChange({ type: 'preset', value: o.value }); setPickerOpen(false); }}
+                className="px-2 py-0.5 text-xs font-mono border transition-all"
+                style={{
+                  borderRadius:    isFirst ? '0.375rem 0 0 0.375rem' : '0',
+                  marginLeft:      i > 0 ? '-1px' : 0,
+                  position:        'relative',
+                  zIndex:          isActive ? 1 : 0,
+                  backgroundColor: isActive
+                    ? isDark ? 'rgba(96,165,250,0.15)' : 'rgba(59,130,246,0.1)'
+                    : isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+                  borderColor: isActive ? '#60a5fa' : t.cardBorder,
+                  color:       isActive ? '#60a5fa' : t.textMuted,
+                }}>
+                {o.label}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setPickerOpen(p => !p)}
+            className="px-2 py-0.5 text-xs font-mono border transition-all"
+            style={{
+              borderRadius:    '0 0.375rem 0.375rem 0',
+              marginLeft:      '-1px',
+              position:        'relative',
+              zIndex:          pickerOpen ? 2 : 0,
+              backgroundColor: pickerOpen
+                ? isDark ? 'rgba(96,165,250,0.15)' : 'rgba(59,130,246,0.1)'
+                : isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+              borderColor: pickerOpen ? '#60a5fa' : t.cardBorder,
+              color:       pickerOpen ? '#60a5fa' : t.textMuted,
+            }}>
+            Custom
+          </button>
+        </div>
+      )}
+
+      {/* Date range picker panel */}
+      {pickerOpen && (
+        <div
+          className="absolute top-full mt-1.5 z-30 rounded-lg border shadow-2xl p-3 space-y-2.5"
+          style={{
+            right:           0,
+            backgroundColor: t.cardBg,
+            borderColor:     t.cardBorder,
+            minWidth:        268,
+            boxShadow: isDark
+              ? '0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)'
+              : '0 16px 48px rgba(0,0,0,0.15)',
+          }}>
+          <div className="text-xs font-mono uppercase tracking-wider pb-0.5"
+            style={{ color: t.textFaint }}>
+            Custom range
+          </div>
+          <div className="space-y-2">
+            <div>
+              <label className="block text-xs font-mono mb-1" style={{ color: t.textMuted }}>
+                From
+              </label>
+              <input
+                type="datetime-local"
+                value={draftFrom}
+                onChange={e => setDraftFrom(e.target.value)}
+                className="w-full rounded border px-2 py-1.5 text-xs font-mono
+                           focus:outline-none focus:ring-2 focus:ring-blue-500/20
+                           focus:border-blue-500/50 transition-all"
+                style={{ backgroundColor: t.inputBg, color: t.textPrimary, borderColor: t.cardBorder }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-mono mb-1" style={{ color: t.textMuted }}>
+                To
+              </label>
+              <input
+                type="datetime-local"
+                value={draftTo}
+                onChange={e => setDraftTo(e.target.value)}
+                className="w-full rounded border px-2 py-1.5 text-xs font-mono
+                           focus:outline-none focus:ring-2 focus:ring-blue-500/20
+                           focus:border-blue-500/50 transition-all"
+                style={{ backgroundColor: t.inputBg, color: t.textPrimary, borderColor: t.cardBorder }}
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between pt-1 border-t"
+            style={{ borderColor: t.cardBorder }}>
+            <button
+              onClick={() => setPickerOpen(false)}
+              className="text-xs font-mono opacity-50 hover:opacity-100 transition-opacity"
+              style={{ color: t.textMuted }}>
+              Cancel
+            </button>
+            <button
+              onClick={applyCustom}
+              disabled={!draftFrom || !draftTo}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono
+                         font-bold transition-all disabled:opacity-40"
+              style={{
+                background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                color:      '#fff',
+                boxShadow:  '0 2px 8px rgba(59,130,246,0.35)',
+              }}>
+              Apply
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── State screens ─────────────────────────────────────────────────────────────
 
 function LoadingState({ t }) {
@@ -605,7 +989,7 @@ function ErrorState({ message, t }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-3">
       <AlertTriangle size={36} className="text-red-500/60" />
-      <p className="font-mono text-sm text-red-400">Cannot reach the WatchTower server</p>
+      <p className="font-mono text-sm text-red-400">Cannot reach the NetWatch server</p>
       <p className="font-mono text-xs" style={{ color: t.textMuted }}>{message}</p>
       <p className="font-mono text-xs mt-2" style={{ color: t.textFaint }}>
         Run <span style={{ color: t.textSecondary }}>npm run dev</span> inside{' '}

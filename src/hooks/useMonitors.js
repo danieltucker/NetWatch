@@ -13,23 +13,32 @@ import { useState, useEffect, useCallback } from 'react';
  * stays live. For longer windows the sparkline is static between fetches
  * (the buckets are already wide enough that one new point doesn't matter).
  */
-export function useMonitors(historyWindow = '1h') {
+// Build the API query string from either a custom/zoom range or a preset window key.
+// Defined outside the hook so it's a stable reference with no closure over state.
+function buildParams(range, window) {
+  if (range?.type === 'custom' || range?.type === 'zoom') {
+    return `from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`;
+  }
+  return `window=${window}`;
+}
+
+export function useMonitors(historyWindow = '1h', historyRange = null) {
   const [monitors, setMonitors] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState(null);
 
-  // ── Fetch / re-fetch when window changes ────────────────────────────────────
+  // ── Fetch / re-fetch when window or custom range changes ───────────────────
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(`/api/monitors?window=${historyWindow}`)
+    fetch(`/api/monitors?${buildParams(historyRange, historyWindow)}`)
       .then(r => {
         if (!r.ok) throw new Error(`Server returned ${r.status}`);
         return r.json();
       })
       .then(data => { setMonitors(data); setLoading(false); })
       .catch(err  => { setError(err.message); setLoading(false); });
-  }, [historyWindow]);
+  }, [historyWindow, historyRange]);
 
   // ── SSE stream ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -40,14 +49,17 @@ export function useMonitors(historyWindow = '1h') {
       setMonitors(prev => prev.map(m => {
         if (m.id !== u.id) return m;
 
-        // Always update the live fields
+        // Always update live fields. uptimePercent from SSE is computed from
+        // the last 1h of data — only apply it when the client is also on the
+        // 1h window; otherwise preserve the value from the last full fetch so
+        // the displayed % stays consistent with the selected window.
         const base = {
           ...m,
-          status:        u.status,
-          currentPing:   u.currentPing,
-          uptimePercent: u.uptimePercent,
-          lastChecked:   u.lastChecked,
-          latest:        u.latest,
+          status:      u.status,
+          currentPing: u.currentPing,
+          lastChecked: u.lastChecked,
+          latest:      u.latest,
+          ...(m.historyWindow === '1h' ? { uptimePercent: u.uptimePercent } : {}),
         };
 
         // Only append the raw point to history for the 1h (raw) window.
@@ -107,14 +119,14 @@ export function useMonitors(historyWindow = '1h') {
   const refresh = useCallback(() => {
     setLoading(true);
     setError(null);
-    return fetch(`/api/monitors?window=${historyWindow}`)
+    return fetch(`/api/monitors?${buildParams(historyRange, historyWindow)}`)
       .then(r => {
         if (!r.ok) throw new Error(`Server returned ${r.status}`);
         return r.json();
       })
       .then(data => { setMonitors(data); setLoading(false); })
       .catch(err  => { setError(err.message); setLoading(false); throw err; });
-  }, [historyWindow]);
+  }, [historyWindow, historyRange]);
 
   return { monitors, loading, error, addMonitor, updateMonitor, deleteMonitor, refresh };
 }

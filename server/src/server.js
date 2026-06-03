@@ -70,7 +70,7 @@ app.get('*', (_req, res) => {
 // ── Start ─────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
-  console.log(`[watchtower] server listening on http://localhost:${PORT}`);
+  console.log(`[netwatch] server listening on http://localhost:${PORT}`);
   initScheduler();
   initReportScheduler();
 });

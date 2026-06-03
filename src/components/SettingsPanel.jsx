@@ -39,7 +39,7 @@ const CHANNEL_VALIDATION = [
 
 // ── SettingsPanel ─────────────────────────────────────────────────────────────
 
-export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange }) {
+export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, alertsAutoOpen = 'outage', onAlertsAutoOpenChange }) {
   const { t, isDark, themeMode, setThemeMode, themeName, setThemeName } = useTheme();
   const [activeTab,        setActiveTab]        = useState('appearance');
   const [mobileContentOpen, setMobileContentOpen] = useState(false);
@@ -334,7 +334,7 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange }
           {/* Version label — desktop only */}
           <div className="hidden sm:block px-5 py-5">
             <div className="text-xs font-mono" style={{ color: t.textFaint }}>
-              WatchTower v5.2
+              NetWatch v6.0
             </div>
           </div>
         </aside>
@@ -393,6 +393,8 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange }
               <GeneralTab
                 chartYMax={chartYMax}
                 onChartYMaxChange={onChartYMaxChange}
+                alertsAutoOpen={alertsAutoOpen}
+                onAlertsAutoOpenChange={onAlertsAutoOpenChange}
                 t={t}
                 isDark={isDark}
               />
@@ -496,7 +498,7 @@ const CHART_Y_OPTIONS = [
   { label: '750ms',  value: '750'  },
 ];
 
-function GeneralTab({ chartYMax, onChartYMaxChange, t, isDark }) {
+function GeneralTab({ chartYMax, onChartYMaxChange, alertsAutoOpen, onAlertsAutoOpenChange, t, isDark }) {
   return (
     <div className="space-y-3">
       <SettingRow
@@ -512,6 +514,22 @@ function GeneralTab({ chartYMax, onChartYMaxChange, t, isDark }) {
           {CHART_Y_OPTIONS.map(o => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
+        </select>
+      </SettingRow>
+
+      <SettingRow
+        title="Auto-open alerts panel"
+        description="Automatically expand the alerts panel when a new alert is detected via live updates."
+        t={t}
+        isDark={isDark}>
+        <select
+          value={alertsAutoOpen}
+          onChange={e => onAlertsAutoOpenChange?.(e.target.value)}
+          className="text-xs font-mono rounded-lg border px-2.5 py-1.5 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          style={{ backgroundColor: t.inputBg, color: t.textSecondary, borderColor: t.cardBorder }}>
+          <option value="outage">On outage only</option>
+          <option value="both">On any alert</option>
+          <option value="never">Never</option>
         </select>
       </SettingRow>
     </div>
@@ -1258,7 +1276,7 @@ function AppearanceTab({ themeMode, setThemeMode, themeName, setThemeName, isDar
       {/* Mode selector */}
       <SettingRow
         title="Mode"
-        description="Choose light or dark, or let WatchTower follow your operating system setting."
+        description="Choose light or dark, or let NetWatch follow your operating system setting."
         t={t}
         isDark={isDark}>
         <div className="flex shrink-0">

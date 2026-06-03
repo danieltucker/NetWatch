@@ -182,12 +182,12 @@ export async function executeCheck(monitor) {
     error:      result.error ? result.error.slice(0, 256) : null,
   });
 
-  // Rolling uptime % from the last 50 results (used for SSE payload)
+  // Uptime % from the last hour — matches the 1h window the GET endpoint uses by default.
+  // Using a time-range query (not LIMIT N) keeps SSE values consistent with what
+  // the client computed from the windowed history on page load.
   const history = db.prepare(`
     SELECT status FROM check_history
-    WHERE monitor_id = ?
-    ORDER BY checked_at DESC
-    LIMIT 50
+    WHERE monitor_id = ? AND checked_at >= datetime('now', '-1 hour')
   `).all(monitor.id);
 
   const upCount       = history.filter(h => h.status === 'up').length;
@@ -252,5 +252,5 @@ export function initScheduler() {
   for (const m of monitors) {
     scheduleMonitor(m.id, m.interval);
   }
-  console.log(`[scheduler] ${monitors.length} monitor(s) scheduled`);
+  console.log(`[netwatch:scheduler] ${monitors.length} monitor(s) scheduled`);
 }

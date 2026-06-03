@@ -15,49 +15,24 @@ const MIN_INTERVAL_S = 30;
 // bucketMinutes: null = return raw points; number = aggregate into N-min buckets
 
 const WINDOWS = {
-  '1h':  { lookback: '-1 hour',   bucketMinutes: null },
-  '12h': { lookback: '-12 hours', bucketMinutes: 15   },
-  '1d':  { lookback: '-1 day',    bucketMinutes: 60   },
-  '1w':  { lookback: '-7 days',   bucketMinutes: 360  },
-  '30d': { lookback: '-30 days',  bucketMinutes: 1440 },
+  '15m': { lookback: '-15 minutes', bucketMinutes: null },
+  '1h':  { lookback: '-1 hour',     bucketMinutes: null },
+  '6h':  { lookback: '-6 hours',    bucketMinutes: null },
+  '12h': { lookback: '-12 hours',   bucketMinutes: 15   },
+  '1d':  { lookback: '-1 day',      bucketMinutes: 60   },
+  '1w':  { lookback: '-7 days',     bucketMinutes: 360  },
+  '30d': { lookback: '-30 days',    bucketMinutes: 1440 },
 };
 
-// ── Windowed history query ────────────────────────────────────────────────────
+// ── Bucket helper (shared by preset + custom range paths) ─────────────────────
 
-function getWindowedHistory(monitorId, window) {
-  const cfg = WINDOWS[window] ?? WINDOWS['1h'];
-
-  const rows = db.prepare(`
-    SELECT checked_at, status, total_ms, dns_ms, tcp_ms, tls_ms,
-           ttfb_ms, http_status, cert_days, error
-    FROM   check_history
-    WHERE  monitor_id = ? AND checked_at >= datetime('now', ?)
-    ORDER  BY checked_at ASC
-  `).all(monitorId, cfg.lookback);
-
-  if (!cfg.bucketMinutes) {
-    // Return raw points for the 1h window
-    return rows.map(r => ({
-      timestamp:  r.checked_at,
-      ping:       r.total_ms,
-      status:     r.status,
-      dnsMs:      r.dns_ms,
-      tcpMs:      r.tcp_ms,
-      tlsMs:      r.tls_ms,
-      ttfbMs:     r.ttfb_ms,
-      httpStatus: r.http_status,
-      certDays:   r.cert_days,
-      error:      r.error,
-    }));
-  }
-
-  // Bucket-aggregate in JS for longer windows
-  const bucketMs = cfg.bucketMinutes * 60 * 1000;
+function bucketRows(rows, bucketMinutes) {
+  const bucketMs = bucketMinutes * 60 * 1000;
   const buckets  = new Map();
 
   for (const r of rows) {
-    const ts    = new Date(r.checked_at).getTime();
-    const bKey  = Math.floor(ts / bucketMs) * bucketMs;
+    const ts   = new Date(r.checked_at).getTime();
+    const bKey = Math.floor(ts / bucketMs) * bucketMs;
     if (!buckets.has(bKey)) buckets.set(bKey, { ts: bKey, pings: [], statuses: [] });
     const b = buckets.get(bKey);
     if (r.total_ms != null) b.pings.push(r.total_ms);
@@ -79,9 +54,62 @@ function getWindowedHistory(monitorId, window) {
     }));
 }
 
+function rowsToRaw(rows) {
+  return rows.map(r => ({
+    timestamp:  r.checked_at,
+    ping:       r.total_ms,
+    status:     r.status,
+    dnsMs:      r.dns_ms,
+    tcpMs:      r.tcp_ms,
+    tlsMs:      r.tls_ms,
+    ttfbMs:     r.ttfb_ms,
+    httpStatus: r.http_status,
+    certDays:   r.cert_days,
+    error:      r.error,
+  }));
+}
+
+// ── Windowed history query ────────────────────────────────────────────────────
+// Accepts either a preset window key OR explicit from/to ISO timestamps.
+// When from+to are provided they take precedence; bucket size is auto-selected
+// from the span so the sparkline stays readable at any zoom level.
+
+function getWindowedHistory(monitorId, window, from = null, to = null) {
+  const historyQuery = db.prepare(`
+    SELECT checked_at, status, total_ms, dns_ms, tcp_ms, tls_ms,
+           ttfb_ms, http_status, cert_days, error
+    FROM   check_history
+    WHERE  monitor_id = ? AND checked_at >= ? AND checked_at <= ?
+    ORDER  BY checked_at ASC
+  `);
+
+  if (from && to) {
+    const rows   = historyQuery.all(monitorId, from, to);
+    const spanH  = (new Date(to) - new Date(from)) / (1000 * 60 * 60);
+    // Auto-select bucket granularity from the requested span
+    const bucketMinutes =
+      spanH <= 6   ? null :
+      spanH <= 24  ? 15   :
+      spanH <= 168 ? 60   : 360;
+
+    return bucketMinutes ? bucketRows(rows, bucketMinutes) : rowsToRaw(rows);
+  }
+
+  const cfg  = WINDOWS[window] ?? WINDOWS['1h'];
+  const rows = db.prepare(`
+    SELECT checked_at, status, total_ms, dns_ms, tcp_ms, tls_ms,
+           ttfb_ms, http_status, cert_days, error
+    FROM   check_history
+    WHERE  monitor_id = ? AND checked_at >= datetime('now', ?)
+    ORDER  BY checked_at ASC
+  `).all(monitorId, cfg.lookback);
+
+  return cfg.bucketMinutes ? bucketRows(rows, cfg.bucketMinutes) : rowsToRaw(rows);
+}
+
 // ── Build full monitor payload ─────────────────────────────────────────────────
 
-function buildMonitorPayload(id, window = '1h') {
+function buildMonitorPayload(id, window = '1h', from = null, to = null) {
   const row = db.prepare('SELECT * FROM monitors WHERE id = ?').get(id);
   if (!row) return null;
 
@@ -92,9 +120,9 @@ function buildMonitorPayload(id, window = '1h') {
   let alertConfig = {};
   try { alertConfig = JSON.parse(monitor.alertConfig || '{}'); } catch {}
   monitor.alertConfig = alertConfig;
-  const history = getWindowedHistory(id, window);
+  const history = getWindowedHistory(id, window, from, to);
 
-  // Uptime% calculated from the windowed history
+  // Uptime% calculated from the windowed/custom history
   const upCount       = history.filter(r => r.status === 'up').length;
   const uptimePercent = history.length
     ? Math.round((upCount / history.length) * 1000) / 10
@@ -117,7 +145,7 @@ function buildMonitorPayload(id, window = '1h') {
     currentPing:   latestRaw?.total_ms    ?? null,
     uptimePercent,
     lastChecked:   latestRaw?.checked_at  ?? null,
-    historyWindow: window,
+    historyWindow: from ? 'custom' : window,
     latest: latestRaw ? {
       dnsMs:      latestRaw.dns_ms,
       tcpMs:      latestRaw.tcp_ms,
@@ -136,15 +164,19 @@ function buildMonitorPayload(id, window = '1h') {
 
 router.get('/', (req, res) => {
   const window = WINDOWS[req.query.window] ? req.query.window : '1h';
+  const from   = req.query.from || null;
+  const to     = req.query.to   || null;
   const ids    = db.prepare('SELECT id FROM monitors ORDER BY created_at ASC').all();
-  res.json(ids.map(r => buildMonitorPayload(r.id, window)));
+  res.json(ids.map(r => buildMonitorPayload(r.id, window, from, to)));
 });
 
 // ── GET /api/monitors/:id ─────────────────────────────────────────────────────
 
 router.get('/:id', (req, res) => {
   const window  = WINDOWS[req.query.window] ? req.query.window : '1h';
-  const payload = buildMonitorPayload(req.params.id, window);
+  const from    = req.query.from || null;
+  const to      = req.query.to   || null;
+  const payload = buildMonitorPayload(req.params.id, window, from, to);
   if (!payload) return res.status(404).json({ error: 'Monitor not found' });
   res.json(payload);
 });

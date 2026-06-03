@@ -1,16 +1,16 @@
-# WatchTower
+# NetWatch
 
 **Self-hosted uptime monitoring for developers, homelabbers, and small teams.**
 
-WatchTower makes real HTTP(S), TCP, and ICMP checks on configurable intervals, stores the results in SQLite, and pushes every result to the browser the instant it lands via Server-Sent Events. No polling, no page refreshes. When something goes down you know immediately - and when it comes back up, you know that too.
+NetWatch makes real HTTP(S), TCP, and ICMP checks on configurable intervals, stores the results in SQLite, and pushes every result to the browser the instant it lands via Server-Sent Events. No polling, no page refreshes. When something goes down you know immediately - and when it comes back up, you know that too.
 
 Run it on a Raspberry Pi, a home server, or a cheap VPS. It tracks public-facing APIs and websites just as well as internal services like a Plex server, a NAS, a database port, or a self-hosted app behind a reverse proxy.
 
 ![Status: Active](https://img.shields.io/badge/status-active-brightgreen)
-![Version](https://img.shields.io/badge/version-5.1-blue)
+![Version](https://img.shields.io/badge/version-6.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
-![WatchTower dashboard](images/screenshot.png)
+![NetWatch dashboard](images/screenshot.png)
 
 ---
 
@@ -19,7 +19,7 @@ Run it on a Raspberry Pi, a home server, or a cheap VPS. It tracks public-facing
 ### Monitoring
 - **Four check types** - HTTP(S) with full timing breakdown, API with response/body validation, TCP port reachability, ICMP ping
 - **Live dashboard** - cards update in real time via Server-Sent Events
-- **Time-based history** - view 1h (raw), 12h, 1d, or 1w of history; sparklines and uptime % always match the selected window
+- **Time-based history** - view 15m, 1h, 6h, 12h, 1d, 1w, or 30d of history, or set a custom date range; sparklines and uptime % always match the selected window
 - **Detailed HTTP timing** - DNS, TCP, TLS, and TTFB measured and displayed separately
 - **SSL certificate monitoring** - days until expiry shown on every HTTPS monitor
 - **Summary bar** - total monitors, online/offline count, and average ping at a glance
@@ -27,13 +27,13 @@ Run it on a Raspberry Pi, a home server, or a cheap VPS. It tracks public-facing
 
 ### Organization
 - **Tags** - freeform labels with autocomplete; filter the grid by one or more tags (OR logic)
-- **Sorting** - by uptime (worst first), average ping (slowest first), or drag-to-reorder in default mode
+- **Sorting** - by status (down first), uptime (worst first), name (A–Z), average ping (slowest first), or drag-to-reorder in default mode
 - **Drag-to-reorder** - grab any card header and drag to rearrange; order persists across sessions
 - **Resizable cards** - toggle any card between 1-column and 2-column width; persists across sessions
 - **Compact reference cards** - reference monitors render in a smaller footprint so they don't crowd your real monitors
 
 ### Alerts
-- **In-app alert panel** - bell icon surfaces active outages with a live elapsed-time counter; resolved alerts show total downtime; dismiss individually or all at once
+- **In-app alert panel** - bell icon surfaces active outages with a live elapsed-time counter; panel auto-opens on new outages (configurable); resolved alerts show total downtime; dismiss individually or all at once
 - **Three alert levels** - Outage, Degraded (configurable ping threshold), and Recovered; each with independent panel visibility and notification frequency (once / every 15 min)
 - **HTTP body validation** - optional plain-string check on the response body; treats a mismatch as DOWN even on a 2xx response
 - **Telegram** - free push notifications via Telegram Bot API
@@ -151,15 +151,15 @@ Sends an ICMP echo request. Measures raw round-trip latency with no concern for 
 docker compose up --build
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Data is stored in a named volume (`watchtower-data`) and survives container restarts.
+Open [http://localhost:3000](http://localhost:3000). Data is stored in a named volume (`netwatch-data`) and survives container restarts.
 
 ### Building and publishing a Docker image
 
 To publish the image to Docker Hub for deployment on a remote host (e.g. TrueNAS, a home server):
 
 ```bash
-docker build -t your-username/watchtower:latest .
-docker push your-username/watchtower:latest
+docker build -t your-username/netwatch:latest .
+docker push your-username/netwatch:latest
 ```
 
 **Cross-platform builds (Apple Silicon → amd64)**
@@ -171,13 +171,13 @@ If you're building on an M-series Mac but deploying to an x86 machine, you need 
 docker buildx create --name multi --use
 
 # Build for amd64 and push directly to the registry
-docker buildx build --platform linux/amd64 -t your-username/watchtower:latest --push .
+docker buildx build --platform linux/amd64 -t your-username/netwatch:latest --push .
 ```
 
 To support both architectures (e.g. run locally on the Mac and deploy to x86):
 
 ```bash
-docker buildx build --platform linux/amd64,linux/arm64 -t your-username/watchtower:latest --push .
+docker buildx build --platform linux/amd64,linux/arm64 -t your-username/netwatch:latest --push .
 ```
 
 > **Note:** `buildx` cross-compiled images can't be loaded into your local Docker daemon — `--push` sends them directly to the registry.
@@ -244,14 +244,14 @@ Click the `<>` icon on any monitor card for a single-monitor widget, or click `<
 ```html
 <!-- Single monitor widget -->
 <iframe
-  src="https://your-watchtower/embed/monitor/MONITOR_ID"
+  src="https://your-netwatch/embed/monitor/MONITOR_ID"
   width="360" height="230" frameborder="0"
   style="border-radius:8px;overflow:hidden"
 ></iframe>
 
 <!-- Full read-only dashboard -->
 <iframe
-  src="https://your-watchtower/embed"
+  src="https://your-netwatch/embed"
   width="100%" height="600" frameborder="0"
   style="border-radius:8px;overflow:hidden"
 ></iframe>
@@ -263,7 +263,7 @@ Embedded views receive live SSE updates and have no edit, delete, or settings co
 
 ## API Reference
 
-WatchTower exposes two HTTP APIs:
+NetWatch exposes two HTTP APIs:
 
 - **Public API** (`/api/v1/`) — read-only, requires an API key. Use this to integrate with external tools, dashboards, or scripts.
 - **Internal API** (`/api/`) — full CRUD, no key required. Intended for the dashboard UI on localhost. Restrict access at the network/proxy level if exposed.
@@ -272,7 +272,7 @@ WatchTower exposes two HTTP APIs:
 
 ### Authentication
 
-The public API uses bearer token authentication. Generate a key in **Settings → General → API Keys**.
+The public API uses bearer token authentication. Generate a key in **Settings → API Keys**.
 
 ```
 Authorization: Bearer wt_your_api_key_here
@@ -442,7 +442,9 @@ Returns all monitors with windowed history.
 
 | Query param | Values | Default | Description |
 |---|---|---|---|
-| `window` | `1h` `12h` `1d` `1w` | `1h` | History lookback. Longer windows return bucketed averages. |
+| `window` | `15m` `1h` `6h` `12h` `1d` `1w` `30d` | `1h` | History lookback. Windows > 6h return bucketed averages. |
+| `from` | ISO 8601 timestamp | — | Custom range start (overrides `window` when paired with `to`) |
+| `to` | ISO 8601 timestamp | — | Custom range end |
 
 ```bash
 curl "http://localhost:3000/api/monitors?window=1d"
@@ -599,7 +601,7 @@ data: {"type":"monitor:deleted","payload":{"id":"550e8400"}}
 ## Project Structure
 
 ```
-watchtower/
+netwatch/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── index.html
