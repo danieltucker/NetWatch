@@ -4,20 +4,46 @@ import { AreaChart, Area, YAxis, ReferenceLine, ResponsiveContainer, Tooltip } f
 import { Edit2, Tag, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { formatInterval, formatTimestamp, certDaysColor } from '../types/monitor';
 import { useTheme } from '../hooks/useTheme';
-import { TimingRow } from './TimingRow';
+import { UptimeBlocks } from './UptimeBlocks';
 
 // ---------------------------------------------------------------------------
-// Status dot
+// Status pill — replaces the 8px dot on full cards
+// ---------------------------------------------------------------------------
+
+const STATUS_PILL_STYLES = {
+  up:       { bg: 'rgba(34,197,94,0.12)',  color: '#4ade80', border: 'rgba(34,197,94,0.3)',  text: 'UP',       glow: false },
+  degraded: { bg: 'rgba(245,158,11,0.12)', color: '#fbbf24', border: 'rgba(245,158,11,0.3)', text: 'DEGRADED', glow: false },
+  down:     { bg: 'rgba(239,68,68,0.15)',  color: '#f87171', border: 'rgba(239,68,68,0.4)',  text: 'DOWN',     glow: true  },
+  pending:  { bg: 'rgba(107,114,128,0.1)', color: '#9ca3af', border: 'rgba(107,114,128,0.2)',text: 'PENDING',  glow: false },
+};
+
+export function StatusPill({ status, size = 'sm' }) {
+  const s = STATUS_PILL_STYLES[status] ?? STATUS_PILL_STYLES.pending;
+  return (
+    <span
+      className={`shrink-0 font-mono font-bold tracking-widest uppercase rounded-full ${s.glow ? 'animate-pulse' : ''}`}
+      style={{
+        fontSize:        size === 'lg' ? 11 : 10,
+        padding:         size === 'lg' ? '3px 10px' : '2px 8px',
+        backgroundColor: s.bg,
+        color:           s.color,
+        border:          `1px solid ${s.border}`,
+        boxShadow:       s.glow ? '0 0 0 1px rgba(239,68,68,0.3), 0 0 10px rgba(239,68,68,0.2)' : 'none',
+      }}>
+      {s.text}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Small status dot — used in compact card and history tables
 // ---------------------------------------------------------------------------
 
 const STATUS_DOT_COLORS = {
-  up:       '#4ade80',
-  degraded: '#fbbf24',
-  down:     '#ef4444',
-  pending:  '#6b7280',
+  up: '#4ade80', degraded: '#fbbf24', down: '#ef4444', pending: '#6b7280',
 };
 
-function StatusDot({ status }) {
+export function StatusDot({ status }) {
   const color = STATUS_DOT_COLORS[status] ?? STATUS_DOT_COLORS.pending;
   return (
     <span
@@ -28,7 +54,7 @@ function StatusDot({ status }) {
 }
 
 // ---------------------------------------------------------------------------
-// Graphical HTTP timing tooltip
+// Sparkline tooltip
 // ---------------------------------------------------------------------------
 
 const TIMING_SEGMENTS = [
@@ -54,12 +80,7 @@ function SparkTooltipContent({ d, t }) {
 
   return (
     <div className="rounded-lg text-xs font-mono shadow-xl border"
-      style={{
-        backgroundColor: t.tooltipBg,
-        borderColor:     t.tooltipBorder,
-        minWidth:        172,
-        padding:         '10px 12px',
-      }}>
+      style={{ backgroundColor: t.tooltipBg, borderColor: t.tooltipBorder, minWidth: 172, padding: '10px 12px' }}>
       {isDown ? (
         <div className="text-red-400 font-bold tracking-widest mb-1.5">DOWN</div>
       ) : (
@@ -75,14 +96,10 @@ function SparkTooltipContent({ d, t }) {
                 return (
                   <div key={key} className="flex items-center gap-2">
                     <span style={{ color: t.textMuted, width: 28, flexShrink: 0 }}>{label}</span>
-                    <div className="flex-1 h-1.5 rounded-full overflow-hidden"
-                      style={{ backgroundColor: t.metricGap }}>
-                      <div className="h-full rounded-full"
-                        style={{ width: `${pct}%`, backgroundColor: color }} />
+                    <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: t.metricGap }}>
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
                     </div>
-                    <span style={{ color, width: 42, textAlign: 'right', flexShrink: 0 }}>
-                      {value}ms
-                    </span>
+                    <span style={{ color, width: 42, textAlign: 'right', flexShrink: 0 }}>{value}ms</span>
                   </div>
                 );
               })}
@@ -110,20 +127,15 @@ function SparkTooltip({ active, payload, coordinate, containerRef }) {
   if (!active || !payload?.length) return null;
   const d = payload[0]?.payload;
   if (!d || !coordinate) return null;
-
   const rect  = containerRef?.current?.getBoundingClientRect();
   const pageX = rect ? rect.left + coordinate.x : coordinate.x;
   const pageY = rect ? rect.top  + coordinate.y : coordinate.y;
   const above = pageY > 160;
-
   return createPortal(
     <div style={{
-      position:      'fixed',
-      left:           pageX,
-      top:            pageY,
-      transform:      above ? 'translate(-50%, calc(-100% - 10px))' : 'translate(-50%, 10px)',
-      zIndex:         9999,
-      pointerEvents:  'none',
+      position: 'fixed', left: pageX, top: pageY,
+      transform: above ? 'translate(-50%, calc(-100% - 10px))' : 'translate(-50%, 10px)',
+      zIndex: 9999, pointerEvents: 'none',
     }}>
       <SparkTooltipContent d={d} t={t} />
     </div>,
@@ -141,13 +153,9 @@ const SparkDot = ({ cx, cy, payload, index, onZoom }) => {
     return (
       <g key={`d-${index}`}>
         {onZoom && (
-          <circle
-            cx={cx} cy={cy} r={10}
-            fill="transparent"
-            style={{ cursor: 'crosshair' }}
+          <circle cx={cx} cy={cy} r={10} fill="transparent" style={{ cursor: 'crosshair' }}
             title="Zoom to this incident"
-            onClick={e => { e.stopPropagation(); onZoom(payload.timestamp); }}
-          />
+            onClick={e => { e.stopPropagation(); onZoom(payload.timestamp); }} />
         )}
         <circle cx={cx} cy={cy} r={3} fill="#ef4444" style={{ pointerEvents: 'none' }} />
       </g>
@@ -157,7 +165,7 @@ const SparkDot = ({ cx, cy, payload, index, onZoom }) => {
 };
 
 // ---------------------------------------------------------------------------
-// SSL cert badge
+// Badges
 // ---------------------------------------------------------------------------
 
 function CertBadge({ certDays }) {
@@ -167,22 +175,17 @@ function CertBadge({ certDays }) {
   return (
     <span className={`flex items-center gap-0.5 text-xs font-mono ${colorCls}`}
       title={`SSL cert expires in ${certDays} days`}>
-      <Icon size={11} />
-      {certDays}d
+      <Icon size={11} />{certDays}d
     </span>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Check-type badge
-// ---------------------------------------------------------------------------
 
 const CHECK_TYPE_LABELS = { http: 'HTTP', api: 'API', tcp: 'TCP', icmp: 'ICMP' };
 
 function CheckTypeBadge({ checkType }) {
   const { t } = useTheme();
   return (
-    <span className="text-xs font-mono px-1.5 py-0.5 rounded border"
+    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border"
       style={{ color: t.textFaint, borderColor: t.cardBorder }}>
       {CHECK_TYPE_LABELS[checkType] ?? checkType}
     </span>
@@ -190,71 +193,55 @@ function CheckTypeBadge({ checkType }) {
 }
 
 // ---------------------------------------------------------------------------
-// Trend computation — split history into two halves, compare averages
+// Trend computation
 // ---------------------------------------------------------------------------
 
 function computeTrend(history) {
   if (!history || history.length < 6) return { ping: null, uptime: null };
-  const mid    = Math.floor(history.length / 2);
-  const first  = history.slice(0, mid);
-  const second = history.slice(mid);
+  const mid = Math.floor(history.length / 2);
+  const [first, second] = [history.slice(0, mid), history.slice(mid)];
 
-  // Ping trend
   const fp = first.map(h => h.ping).filter(p => p != null);
   const sp = second.map(h => h.ping).filter(p => p != null);
   let ping = null;
   if (fp.length >= 3 && sp.length >= 3) {
-    const fa = fp.reduce((s, v) => s + v, 0) / fp.length;
-    const sa = sp.reduce((s, v) => s + v, 0) / sp.length;
-    const d  = Math.round(sa - fa);
+    const d = Math.round(sp.reduce((s, v) => s + v, 0) / sp.length - fp.reduce((s, v) => s + v, 0) / fp.length);
     if (Math.abs(d) >= 2) ping = { delta: Math.abs(d), direction: d < 0 ? 'faster' : 'slower' };
   }
 
-  // Uptime trend
   const toU = h => h.uptimePct ?? (h.status === 'up' ? 100 : h.status === 'down' ? 0 : null);
-  const fu  = first.map(toU).filter(v => v != null);
-  const su  = second.map(toU).filter(v => v != null);
+  const fu = first.map(toU).filter(v => v != null);
+  const su = second.map(toU).filter(v => v != null);
   let uptime = null;
   if (fu.length >= 3 && su.length >= 3) {
-    const fa = fu.reduce((s, v) => s + v, 0) / fu.length;
-    const sa = su.reduce((s, v) => s + v, 0) / su.length;
-    const d  = Math.round((sa - fa) * 10) / 10;
+    const d = Math.round((su.reduce((s, v) => s + v, 0) / su.length - fu.reduce((s, v) => s + v, 0) / fu.length) * 10) / 10;
     if (Math.abs(d) >= 0.1) uptime = { delta: Math.abs(d), direction: d > 0 ? 'up' : 'down' };
   }
-
   return { ping, uptime };
 }
 
 // ---------------------------------------------------------------------------
-// Ping metric cell — inverted bar (full = fast, empty = slow)
+// Ping metric cell
 // ---------------------------------------------------------------------------
 
 function PingMetric({ ping, trend, hovered, isDark, t }) {
   const hasValue = ping != null;
-  const color = !hasValue ? t.textFaint
-    : ping < 100  ? '#4ade80'
-    : ping < 300  ? '#fbbf24'
-    :               '#f87171';
+  const color = !hasValue ? t.textFaint : ping < 100 ? '#4ade80' : ping < 300 ? '#fbbf24' : '#f87171';
   const barPct = hasValue ? Math.max(3, 100 - Math.min(100, (ping / 1000) * 100)) : 0;
-  const tileBg = isDark
-    ? (hovered ? 'rgba(255,255,255,0.025)' : t.cardBg)
-    : (hovered ? 'rgba(0,0,0,0.015)'       : t.cardBg);
+  const tileBg = isDark ? (hovered ? 'rgba(255,255,255,0.025)' : t.cardBg)
+                        : (hovered ? 'rgba(0,0,0,0.015)'       : t.cardBg);
   const trendColor = trend?.direction === 'faster' ? '#4ade80' : '#f87171';
 
   return (
-    <div className="px-3 py-3" style={{ backgroundColor: tileBg, transition: 'background-color 150ms ease' }}>
-      <div className="text-xs font-mono uppercase tracking-wider mb-1.5" style={{ color: t.textFaint }}>
-        Ping
-      </div>
-      <div className="text-lg font-mono font-bold leading-none mb-1"
-        style={{ color: hasValue ? color : t.textFaint }}>
+    <div style={{ backgroundColor: tileBg, transition: 'background-color 150ms ease', padding: '12px 14px 10px' }}>
+      <div className="text-[10px] font-mono uppercase tracking-wider mb-1.5" style={{ color: t.textFaint }}>Ping</div>
+      <div className="text-xl font-mono font-bold leading-none mb-1" style={{ color: hasValue ? color : t.textFaint }}>
         {hasValue ? `${ping}ms` : '—'}
       </div>
-      {/* Fixed-height trend slot keeps tile height consistent whether or not trend data is present */}
       <div className="h-[14px] text-[10px] font-mono opacity-75 mb-1.5" style={{ color: trendColor }}>
         {trend ? `${trend.direction === 'faster' ? '↓' : '↑'} ${trend.delta}ms` : ''}
       </div>
-      <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: t.metricGap }}>
+      <div className="h-[3px] rounded-full overflow-hidden" style={{ backgroundColor: t.metricGap }}>
         <div className="h-full rounded-full transition-all duration-700"
           style={{ width: `${barPct}%`, backgroundColor: hasValue ? color : 'transparent' }} />
       </div>
@@ -263,34 +250,26 @@ function PingMetric({ ping, trend, hovered, isDark, t }) {
 }
 
 // ---------------------------------------------------------------------------
-// Uptime metric cell — bar fills with uptime %
+// Uptime metric cell
 // ---------------------------------------------------------------------------
 
 function UptimeMetric({ uptimePercent, hasHistory, trend, hovered, isDark, t }) {
-  const color = !hasHistory ? t.textFaint
-    : uptimePercent >= 99 ? '#4ade80'
-    : uptimePercent >= 95 ? '#fbbf24'
-    :                       '#f87171';
+  const color = !hasHistory ? t.textFaint : uptimePercent >= 99 ? '#4ade80' : uptimePercent >= 95 ? '#fbbf24' : '#f87171';
   const barPct = hasHistory ? uptimePercent : 0;
-  const tileBg = isDark
-    ? (hovered ? 'rgba(255,255,255,0.025)' : t.cardBg)
-    : (hovered ? 'rgba(0,0,0,0.015)'       : t.cardBg);
+  const tileBg = isDark ? (hovered ? 'rgba(255,255,255,0.025)' : t.cardBg)
+                        : (hovered ? 'rgba(0,0,0,0.015)'       : t.cardBg);
   const trendColor = trend?.direction === 'up' ? '#4ade80' : '#f87171';
 
   return (
-    <div className="px-3 py-3" style={{ backgroundColor: tileBg, transition: 'background-color 150ms ease' }}>
-      <div className="text-xs font-mono uppercase tracking-wider mb-1.5" style={{ color: t.textFaint }}>
-        Uptime
-      </div>
-      <div className="text-lg font-mono font-bold leading-none mb-1"
-        style={{ color: hasHistory ? color : t.textFaint }}>
+    <div style={{ backgroundColor: tileBg, transition: 'background-color 150ms ease', padding: '12px 14px 10px' }}>
+      <div className="text-[10px] font-mono uppercase tracking-wider mb-1.5" style={{ color: t.textFaint }}>Uptime</div>
+      <div className="text-xl font-mono font-bold leading-none mb-1" style={{ color: hasHistory ? color : t.textFaint }}>
         {hasHistory ? `${uptimePercent}%` : '—'}
       </div>
-      {/* Fixed-height trend slot */}
       <div className="h-[14px] text-[10px] font-mono opacity-75 mb-1.5" style={{ color: trendColor }}>
         {trend ? `${trend.direction === 'up' ? '↑' : '↓'} ${trend.delta}%` : ''}
       </div>
-      <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: t.metricGap }}>
+      <div className="h-[3px] rounded-full overflow-hidden" style={{ backgroundColor: t.metricGap }}>
         <div className="h-full rounded-full transition-all duration-700"
           style={{ width: `${barPct}%`, backgroundColor: hasHistory ? color : 'transparent' }} />
       </div>
@@ -305,79 +284,74 @@ function UptimeMetric({ uptimePercent, hasHistory, trend, hovered, isDark, t }) 
 function MonitorCardInner({
   monitor, onEdit, onCardClick, compact = false,
   dragHandleProps, isDragging = false,
-  chartYMax = 'auto',
-  onZoomToPoint,
+  chartYMax = 'auto', onZoomToPoint,
 }) {
   const { t, isDark } = useTheme();
   const chartRef = useRef(null);
   const [hovered, setHovered] = useState(false);
 
-  const tooltipContent = useMemo(
-    () => (props) => <SparkTooltip {...props} containerRef={chartRef} />,
-    []
-  );
-
-  const dotRenderer = useMemo(
-    () => (props) => <SparkDot {...props} onZoom={onZoomToPoint} />,
-    [onZoomToPoint]
-  );
-
+  const tooltipContent = useMemo(() => (props) => <SparkTooltip {...props} containerRef={chartRef} />, []);
+  const dotRenderer    = useMemo(() => (props) => <SparkDot {...props} onZoom={onZoomToPoint} />, [onZoomToPoint]);
   const trend = useMemo(() => computeTrend(monitor.history), [monitor.history]);
 
   const chartData = monitor.history.map((h, i) => ({
-    i,
-    ping:      h.ping ?? 0,
-    status:    h.status,
-    timestamp: h.timestamp,
-    dnsMs:     h.dnsMs,
-    tcpMs:     h.tcpMs,
-    tlsMs:     h.tlsMs,
-    ttfbMs:    h.ttfbMs,
+    i, ping: h.ping ?? 0, status: h.status, timestamp: h.timestamp,
+    dnsMs: h.dnsMs, tcpMs: h.tcpMs, tlsMs: h.tlsMs, ttfbMs: h.ttfbMs,
   }));
 
   const displayStatus =
-    monitor.status === 'up' &&
-    monitor.degradedThreshold != null &&
-    monitor.currentPing != null &&
-    monitor.currentPing > monitor.degradedThreshold
-      ? 'degraded'
-      : monitor.status;
+    monitor.status === 'up' && monitor.degradedThreshold != null && monitor.currentPing != null &&
+    monitor.currentPing > monitor.degradedThreshold ? 'degraded' : monitor.status;
 
   const lineColor  = displayStatus === 'down' ? '#ef4444' : displayStatus === 'degraded' ? '#f59e0b' : '#22c55e';
   const gradientId = `spark-${monitor.id}`;
-
   const alertBadges = monitor.alertTypes?.filter(a => a !== 'None') ?? [];
+  const yDomain = [0, chartYMax === 'auto' ? 'auto' : Number(chartYMax)];
 
-  const cardShadow = isDark
-    ? '0 2px 8px rgba(0,0,0,0.3)'
-    : '0 1px 4px rgba(0,0,0,0.07)';
-
-  const yMax    = chartYMax === 'auto' ? 'auto' : Number(chartYMax);
-  const yDomain = [0, yMax];
-
-  const showThresholdLine =
-    monitor.degradedThreshold != null &&
+  const showThresholdLine = monitor.degradedThreshold != null &&
     (monitor.checkType === 'http' || monitor.checkType === 'api');
 
-  // ── Compact layout (reference monitors) ───────────────────────────────────
+  // ── Status-derived styles ────────────────────────────────────────────────
+  const statusTopBorder = displayStatus === 'down'     ? '#ef4444'
+    : displayStatus === 'degraded'                     ? '#f59e0b'
+    : displayStatus === 'up'                           ? 'rgba(34,197,94,0.4)'
+    : 'transparent';
+
+  const cardBg = hovered
+    ? (isDark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.015)')
+    : displayStatus === 'down'
+      ? (isDark ? 'rgba(239,68,68,0.04)' : 'rgba(239,68,68,0.03)')
+      : t.cardBg;
+
+  const cardBorder = isDragging
+    ? (isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)')
+    : hovered
+      ? (displayStatus === 'down'     ? 'rgba(239,68,68,0.5)'
+        : displayStatus === 'degraded' ? 'rgba(245,158,11,0.4)'
+        : isDark                       ? 'rgba(255,255,255,0.15)'
+        :                                'rgba(0,0,0,0.15)')
+      : t.cardBorder;
+
+  const cardShadow = hovered
+    ? (isDark ? '0 2px 6px rgba(0,0,0,0.5), 0 8px 24px rgba(0,0,0,0.25)'
+              : '0 2px 4px rgba(0,0,0,0.12), 0 8px 20px rgba(0,0,0,0.09)')
+    : (isDark ? '0 1px 3px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.2)'
+              : '0 1px 2px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.06)');
+
+  // ── Compact layout (reference monitors) ─────────────────────────────────
   if (compact) {
     return (
       <div className="flex flex-col rounded-lg border"
         style={{ backgroundColor: t.cardBg, borderColor: t.cardBorder, boxShadow: cardShadow }}>
-
         <div className="flex items-center justify-between px-3 pt-3 pb-1.5 gap-1.5">
           <StatusDot status={displayStatus} />
-          <span className="text-xs font-mono truncate font-semibold flex-1 ml-1"
-            style={{ color: t.textSecondary }}>
+          <span className="text-xs font-mono truncate font-semibold flex-1 ml-1" style={{ color: t.textSecondary }}>
             {monitor.label}
           </span>
           {monitor.currentPing != null && (
-            <span className="text-xs font-mono shrink-0" style={{ color: t.textMuted }}>
-              {monitor.currentPing}ms
-            </span>
+            <span className="text-xs font-mono shrink-0" style={{ color: t.textMuted }}>{monitor.currentPing}ms</span>
           )}
         </div>
-
         <div className="px-2 py-1.5">
           {chartData.length > 0 ? (
             <div ref={chartRef} style={{ width: '100%', height: 36 }}>
@@ -389,127 +363,89 @@ function MonitorCardInner({
                       <stop offset="95%" stopColor={lineColor} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <Area type="monotone" dataKey="ping"
-                    stroke={lineColor} strokeWidth={1.5}
-                    fill={`url(#${gradientId})`}
-                    dot={dotRenderer}
-                    activeDot={{ r: 3, fill: lineColor, strokeWidth: 0 }}
-                    isAnimationActive={false}
-                  />
-                  <Tooltip content={tooltipContent}
-                    cursor={{ stroke: t.cardBorder, strokeWidth: 1 }} />
+                  <Area type="monotone" dataKey="ping" stroke={lineColor} strokeWidth={1.5}
+                    fill={`url(#${gradientId})`} dot={dotRenderer}
+                    activeDot={{ r: 3, fill: lineColor, strokeWidth: 0 }} isAnimationActive={false} />
+                  <Tooltip content={tooltipContent} cursor={{ stroke: t.cardBorder, strokeWidth: 1 }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="flex items-center justify-center h-9 text-xs font-mono"
-              style={{ color: t.textFaint }}>
+            <div className="flex items-center justify-center h-9 text-xs font-mono" style={{ color: t.textFaint }}>
               pending…
             </div>
           )}
         </div>
-
         <div className="px-3 pb-2">
-          <span className="text-xs font-mono" style={{ color: t.textFaint }}>
-            {monitor.target}
-          </span>
+          <span className="text-xs font-mono" style={{ color: t.textFaint }}>{monitor.target}</span>
         </div>
       </div>
     );
   }
 
-  const hoverBg          = isDark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.015)';
-  const hoverBorderColor = isDark ? 'rgba(255,255,255,0.15)'  : 'rgba(0,0,0,0.15)';
-
-  // ── Full layout ───────────────────────────────────────────────────────────
+  // ── Full layout ──────────────────────────────────────────────────────────
   return (
     <div
-      className="flex flex-col rounded-lg border transition-colors cursor-pointer"
+      className="flex flex-col rounded-lg border cursor-pointer"
       style={{
-        backgroundColor: hovered ? hoverBg : t.cardBg,
-        borderColor:     isDragging ? hoverBorderColor : hovered ? hoverBorderColor : t.cardBorder,
+        backgroundColor: cardBg,
+        borderColor:     cardBorder,
+        borderTop:       `3px solid ${statusTopBorder}`,
         opacity:         isDragging ? 0.85 : 1,
         boxShadow:       cardShadow,
+        transition:      'background-color 150ms ease, border-color 150ms ease, box-shadow 200ms ease',
       }}
       onClick={() => onCardClick?.(monitor)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}>
 
-      {/* ── Header — drag handle ── */}
-      <div
-        className="px-4 pt-4 pb-2 rounded-t-lg"
+      {/* ── Header ── */}
+      <div className="px-4 pt-4 pb-2 rounded-t-lg"
         style={{ cursor: dragHandleProps ? 'grab' : 'default' }}
         {...(dragHandleProps || {})}>
-
         <div className="flex items-center gap-2">
-          <StatusDot status={displayStatus} />
-          <span className="text-sm font-semibold leading-snug flex-1 truncate min-w-0"
-            title={monitor.label}
-            style={{ color: t.textPrimary }}>
-            {monitor.label}
-          </span>
+          <StatusPill status={displayStatus} />
+          {(monitor.checkType === 'http' || monitor.checkType === 'api') ? (
+            <a href={monitor.target.startsWith('http') ? monitor.target : `https://${monitor.target}`}
+              target="_blank" rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              title={monitor.target}
+              className="text-[15px] font-semibold leading-snug flex-1 truncate min-w-0 hover:underline"
+              style={{ color: t.textPrimary }}>
+              {monitor.label}
+            </a>
+          ) : (
+            <span className="text-[15px] font-semibold leading-snug flex-1 truncate min-w-0"
+              title={monitor.label} style={{ color: t.textPrimary }}>
+              {monitor.label}
+            </span>
+          )}
           <CheckTypeBadge checkType={monitor.checkType} />
           {onEdit && (
-            <button
-              onClick={e => { e.stopPropagation(); onEdit(monitor); }}
-              onPointerDown={e => e.stopPropagation()}
-              title="Edit"
+            <button onClick={e => { e.stopPropagation(); onEdit(monitor); }}
+              onPointerDown={e => e.stopPropagation()} title="Edit"
               className="p-1.5 rounded transition-opacity opacity-40 hover:opacity-100 shrink-0"
               style={{ color: t.textSecondary }}>
               <Edit2 size={13} />
             </button>
           )}
         </div>
-      </div>
-
-      {/* ── Target row ── */}
-      <div className="px-4 pb-3">
-        {(monitor.checkType === 'http' || monitor.checkType === 'api') ? (
-          <a
-            href={monitor.target.startsWith('http') ? monitor.target : `https://${monitor.target}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={e => e.stopPropagation()}
-            className="text-xs font-mono truncate block hover:underline"
-            style={{ color: t.textMuted }}>
-            {monitor.target}
-            {monitor.port && <span style={{ color: t.textFaint }}>:{monitor.port}</span>}
-          </a>
-        ) : (
-          <span className="text-xs font-mono truncate block" style={{ color: t.textMuted }}>
-            {monitor.target}
-            {monitor.port && <span style={{ color: t.textFaint }}>:{monitor.port}</span>}
-          </span>
-        )}
         {monitor.description && (
-          <span className="text-xs font-mono truncate block mt-0.5" style={{ color: t.textFaint }}>
+          <div className="mt-1 text-xs font-mono truncate" style={{ color: t.textFaint }}>
             {monitor.description}
-          </span>
+          </div>
         )}
       </div>
 
-      {/* ── Metrics row: ping + uptime ── */}
-      <div className="grid grid-cols-2 gap-px border-t border-b"
-        style={{ backgroundColor: t.metricGap, borderColor: t.metricGap }}>
-        <PingMetric
-          ping={monitor.currentPing}
-          trend={trend.ping}
-          hovered={hovered}
-          isDark={isDark}
-          t={t} />
-        <UptimeMetric
-          uptimePercent={monitor.uptimePercent}
-          hasHistory={monitor.history.length > 0}
-          trend={trend.uptime}
-          hovered={hovered}
-          isDark={isDark}
-          t={t} />
+      {/* ── Metrics row ── */}
+      <div className="grid grid-cols-2">
+        <PingMetric   ping={monitor.currentPing} trend={trend.ping}
+          hovered={hovered} isDark={isDark} t={t} />
+        <UptimeMetric uptimePercent={monitor.uptimePercent} hasHistory={monitor.history.length > 0}
+          trend={trend.uptime} hovered={hovered} isDark={isDark} t={t} />
       </div>
 
-      {/* ── Timing breakdown (HTTP / API) ── */}
-      <TimingRow latest={monitor.latest} />
-
-      {/* ── Assertion error hint (API checks) ── */}
+      {/* ── Assertion error hint ── */}
       {monitor.status === 'down' && monitor.latest?.error && (
         <div className="px-3 pb-2">
           <span className="text-xs font-mono leading-relaxed line-clamp-2" style={{ color: '#f87171' }}
@@ -519,10 +455,15 @@ function MonitorCardInner({
         </div>
       )}
 
+      {/* ── Uptime blocks strip ── */}
+      <div className="px-2 pt-2 pb-1">
+        <UptimeBlocks history={monitor.history} count={40} blockHeight={8} />
+      </div>
+
       {/* ── Sparkline ── */}
-      <div className="px-2 py-2">
+      <div className="px-2 pb-2">
         {chartData.length > 0 ? (
-          <div ref={chartRef} style={{ width: '100%', height: 68 }}>
+          <div ref={chartRef} style={{ width: '100%', height: 64 }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData} margin={{ top: 4, right: 2, left: 2, bottom: 4 }}>
                 <defs>
@@ -532,51 +473,35 @@ function MonitorCardInner({
                   </linearGradient>
                 </defs>
                 <YAxis domain={yDomain} hide />
-                <Area type="monotone" dataKey="ping"
-                  stroke={lineColor} strokeWidth={1.5}
-                  fill={`url(#${gradientId})`}
-                  dot={<SparkDot />}
-                  activeDot={{ r: 3, fill: lineColor, strokeWidth: 0 }}
-                  isAnimationActive={false}
-                />
+                <Area type="monotone" dataKey="ping" stroke={lineColor} strokeWidth={1.5}
+                  fill={`url(#${gradientId})`} dot={<SparkDot />}
+                  activeDot={{ r: 3, fill: lineColor, strokeWidth: 0 }} isAnimationActive={false} />
                 {showThresholdLine && (
-                  <ReferenceLine
-                    y={monitor.degradedThreshold}
-                    stroke="#f59e0b"
-                    strokeDasharray="4 3"
-                    strokeWidth={1}
-                  />
+                  <ReferenceLine y={monitor.degradedThreshold} stroke="#f59e0b"
+                    strokeDasharray="4 3" strokeWidth={1} />
                 )}
-                <Tooltip content={tooltipContent}
-                  cursor={{ stroke: t.cardBorder, strokeWidth: 1 }} />
+                <Tooltip content={tooltipContent} cursor={{ stroke: t.cardBorder, strokeWidth: 1 }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         ) : (
-          <div className="flex items-center justify-center h-[68px] text-xs font-mono"
-            style={{ color: t.textFaint }}>
+          <div className="flex items-center justify-center h-16 text-xs font-mono" style={{ color: t.textFaint }}>
             awaiting first check…
           </div>
         )}
       </div>
 
       {/* ── Footer ── */}
-      <div className="px-4 pb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-auto">
+      <div className="px-4 pb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-auto opacity-60">
         <div className="flex items-center gap-2 mr-auto">
           <span className="text-xs font-mono" style={{ color: t.textFaint }}>
             {monitor.lastChecked ? (
-              <>
-                <span style={{ color: t.textMuted }}>checked</span>{' '}
-                {formatTimestamp(monitor.lastChecked)}
-              </>
+              <><span style={{ color: t.textMuted }}>checked</span>{' '}{formatTimestamp(monitor.lastChecked)}</>
             ) : 'not yet checked'}
           </span>
-          <span className="text-xs font-mono" style={{ color: t.textFaint }}>
-            · {formatInterval(monitor.interval)}
-          </span>
+          <span className="text-xs font-mono" style={{ color: t.textFaint }}>· {formatInterval(monitor.interval)}</span>
           <CertBadge certDays={monitor.latest?.certDays} />
         </div>
-
         <div className="flex items-center gap-1 flex-wrap">
           {alertBadges.map(a => (
             <span key={a} className="text-xs font-mono px-1.5 py-0.5 rounded border"
@@ -585,11 +510,9 @@ function MonitorCardInner({
             </span>
           ))}
           {monitor.tags?.filter(tag => tag !== '_ref').map(tag => (
-            <span key={tag}
-              className="flex items-center gap-0.5 text-xs font-mono px-1.5 py-0.5 rounded"
+            <span key={tag} className="flex items-center gap-0.5 text-xs font-mono px-1.5 py-0.5 rounded"
               style={{ color: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.2)' }}>
-              <Tag size={9} />
-              {tag}
+              <Tag size={9} />{tag}
             </span>
           ))}
         </div>
