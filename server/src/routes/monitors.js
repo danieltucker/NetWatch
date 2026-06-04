@@ -244,7 +244,9 @@ router.post('/', (req, res) => {
 
   scheduleMonitor(id, interval);
 
-  res.status(201).json(buildMonitorPayload(id));
+  const payload = buildMonitorPayload(id);
+  broadcast('monitor:created', payload);
+  res.status(201).json(payload);
 });
 
 // ── PUT /api/monitors/:id ─────────────────────────────────────────────────────
@@ -317,7 +319,9 @@ router.put('/:id', (req, res) => {
 
   scheduleMonitor(id, next.interval);
 
-  res.json(buildMonitorPayload(id));
+  const payload = buildMonitorPayload(id);
+  broadcast('monitor:updated', payload);
+  res.json(payload);
 });
 
 // ── DELETE /api/monitors/:id ──────────────────────────────────────────────────

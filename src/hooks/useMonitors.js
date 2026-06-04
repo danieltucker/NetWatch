@@ -74,6 +74,16 @@ export function useMonitors(historyWindow = '1h', historyRange = null) {
       }));
     });
 
+    es.addEventListener('monitor:created', (e) => {
+      const created = JSON.parse(e.data);
+      setMonitors(prev => prev.some(m => m.id === created.id) ? prev : [...prev, created]);
+    });
+
+    es.addEventListener('monitor:updated', (e) => {
+      const updated = JSON.parse(e.data);
+      setMonitors(prev => prev.map(m => m.id === updated.id ? updated : m));
+    });
+
     es.addEventListener('monitor:deleted', (e) => {
       const { id } = JSON.parse(e.data);
       setMonitors(prev => prev.filter(m => m.id !== id));
