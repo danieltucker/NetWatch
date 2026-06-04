@@ -136,7 +136,9 @@ function ModalTooltip({ active, payload, t }) {
 // History tab
 // ---------------------------------------------------------------------------
 
-function HistoryTab({ history, t }) {
+function HistoryTab({ history, t, isDark }) {
+  const [expandedIdx, setExpandedIdx] = useState(null);
+
   if (history.length === 0) {
     return (
       <div className="flex items-center justify-center py-16 text-xs font-mono"
@@ -145,6 +147,9 @@ function HistoryTab({ history, t }) {
       </div>
     );
   }
+
+  const reversed = [...history].reverse();
+
   return (
     <table className="w-full text-xs font-mono">
       <thead className="sticky top-0" style={{ backgroundColor: t.cardBg }}>
@@ -156,10 +161,14 @@ function HistoryTab({ history, t }) {
         </tr>
       </thead>
       <tbody>
-        {[...history].reverse().map((entry, i) => {
+        {reversed.map((entry, i) => {
+          const isExpanded  = expandedIdx === i;
           const statusColor = entry.status === 'down' ? '#f87171'
             : entry.status === 'up' ? '#4ade80'
             : t.textSecondary;
+          const hasTimings  = entry.dnsMs != null;
+          const hasDetail   = hasTimings || entry.httpStatus != null || !!entry.error ||
+                              (entry.aggregated && entry.uptimePct != null);
 
           let info = null;
           if (entry.aggregated && entry.uptimePct != null) {
@@ -180,24 +189,91 @@ function HistoryTab({ history, t }) {
           }
 
           return (
-            <tr key={i} className="border-b last:border-0" style={{ borderColor: t.metricGap }}>
-              <td className="px-4 py-2" style={{ color: t.textFaint }}>
-                {entry.timestamp ? formatTimestamp(entry.timestamp) : '—'}
-              </td>
-              <td className="px-4 py-2">
-                <div className="flex items-center gap-1.5">
-                  <StatusDot status={entry.status} />
-                  <span style={{ color: statusColor }}>{entry.status}</span>
-                  {entry.aggregated && (
-                    <span className="opacity-50" style={{ color: t.textFaint }}>(avg)</span>
-                  )}
-                </div>
-              </td>
-              <td className="px-4 py-2 text-right" style={{ color: t.textSecondary }}>
-                {entry.ping != null ? `${entry.ping}ms` : '—'}
-              </td>
-              <td className="px-4 py-2">{info ?? <span style={{ color: t.textFaint }}>—</span>}</td>
-            </tr>
+            <React.Fragment key={i}>
+              <tr
+                className="border-b cursor-pointer hover:opacity-80 transition-opacity"
+                style={{ borderColor: t.metricGap }}
+                onClick={() => setExpandedIdx(isExpanded ? null : i)}>
+                <td className="py-2 pl-2 pr-4 border-l-2 transition-colors"
+                  style={{
+                    color:            t.textFaint,
+                    borderLeftColor:  isExpanded ? '#60a5fa' : 'transparent',
+                  }}>
+                  {entry.timestamp ? formatTimestamp(entry.timestamp) : '—'}
+                </td>
+                <td className="px-4 py-2">
+                  <div className="flex items-center gap-1.5">
+                    <StatusDot status={entry.status} />
+                    <span style={{ color: statusColor }}>{entry.status}</span>
+                    {entry.aggregated && (
+                      <span className="opacity-50" style={{ color: t.textFaint }}>(avg)</span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-2 text-right" style={{ color: t.textSecondary }}>
+                  {entry.ping != null ? `${entry.ping}ms` : '—'}
+                </td>
+                <td className="px-4 py-2">{info ?? <span style={{ color: t.textFaint }}>—</span>}</td>
+              </tr>
+
+              {isExpanded && (
+                <tr className="border-b" style={{ borderColor: t.metricGap }}>
+                  <td colSpan={4} className="px-5 py-3 border-l-2"
+                    style={{
+                      borderLeftColor:  '#60a5fa',
+                      backgroundColor:  isDark ? 'rgba(96,165,250,0.05)' : 'rgba(59,130,246,0.03)',
+                      borderTopColor:   t.metricGap,
+                    }}>
+                    {hasDetail ? (
+                      <div className="space-y-2">
+                        {hasTimings && (
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <TimingChip label="DNS"  value={entry.dnsMs}  color="#3b82f6" t={t} />
+                            <TimingChip label="TCP"  value={entry.tcpMs}  color="#22c55e" t={t} />
+                            {entry.tlsMs != null && (
+                              <TimingChip label="TLS" value={entry.tlsMs} color="#f59e0b" t={t} />
+                            )}
+                            <TimingChip label="TTFB" value={entry.ttfbMs} color="#a78bfa" t={t} />
+                            {entry.httpStatus != null && (
+                              <span className="ml-2 text-xs font-mono"
+                                style={{ color: entry.httpStatus >= 400 ? '#f87171' : t.textMuted }}>
+                                HTTP {entry.httpStatus}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {!hasTimings && entry.httpStatus != null && (
+                          <div className="text-xs font-mono"
+                            style={{ color: entry.httpStatus >= 400 ? '#f87171' : t.textMuted }}>
+                            HTTP {entry.httpStatus}
+                          </div>
+                        )}
+                        {entry.error && (
+                          <div className="text-xs font-mono leading-relaxed" style={{ color: '#f87171' }}>
+                            {entry.error}
+                          </div>
+                        )}
+                        {entry.aggregated && entry.uptimePct != null && (
+                          <div className="text-xs font-mono" style={{ color: t.textSecondary }}>
+                            Uptime:{' '}
+                            <span style={{
+                              color: entry.uptimePct >= 99 ? '#4ade80'
+                                : entry.uptimePct >= 95 ? '#fbbf24' : '#f87171',
+                            }}>
+                              {entry.uptimePct}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs font-mono" style={{ color: t.textFaint }}>
+                        No additional detail available
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              )}
+            </React.Fragment>
           );
         })}
       </tbody>
@@ -209,8 +285,9 @@ function HistoryTab({ history, t }) {
 // Incidents tab
 // ---------------------------------------------------------------------------
 
-function IncidentsTab({ history, t }) {
+function IncidentsTab({ history, t, isDark }) {
   const incidents = useMemo(() => computeIncidents(history), [history]);
+  const [expandedIdx, setExpandedIdx] = useState(null);
 
   if (history.length === 0) {
     return (
@@ -234,48 +311,101 @@ function IncidentsTab({ history, t }) {
 
   return (
     <div className="divide-y" style={{ borderColor: t.metricGap }}>
-      {incidents.map((inc, i) => (
-        <div key={i}
-          className="flex items-start gap-3 px-5 py-3.5 border-l-2"
-          style={{ borderLeftColor: 'rgba(239,68,68,0.5)' }}>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-xs font-mono font-semibold" style={{ color: '#f87171' }}>
-                ↓ Down
-              </span>
-              {inc.ongoing && (
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded"
-                  style={{ backgroundColor: 'rgba(239,68,68,0.12)', color: '#f87171' }}>
-                  ongoing
-                </span>
-              )}
+      {incidents.map((inc, i) => {
+        const isExpanded = expandedIdx === i;
+        return (
+          <div key={i}>
+            {/* Collapsed row */}
+            <div
+              className="flex items-start gap-3 px-5 py-3.5 border-l-2 cursor-pointer hover:opacity-80 transition-opacity"
+              style={{ borderLeftColor: isExpanded ? '#ef4444' : 'rgba(239,68,68,0.5)' }}
+              onClick={() => setExpandedIdx(isExpanded ? null : i)}>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-xs font-mono font-semibold" style={{ color: '#f87171' }}>
+                    ↓ Down
+                  </span>
+                  {inc.ongoing && (
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded"
+                      style={{ backgroundColor: 'rgba(239,68,68,0.12)', color: '#f87171' }}>
+                      ongoing
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs font-mono" style={{ color: t.textSecondary }}>
+                  {inc.start ? formatTimestamp(inc.start) : '—'}
+                  {inc.end && (
+                    <span style={{ color: t.textFaint }}>
+                      {' — '}{formatTimestamp(inc.end)}
+                    </span>
+                  )}
+                </div>
+                {inc.error && !isExpanded && (
+                  <div className="mt-1 text-[10px] font-mono truncate"
+                    style={{ color: 'rgba(248,113,113,0.7)' }}
+                    title={inc.error}>
+                    {inc.error}
+                  </div>
+                )}
+              </div>
+              <div className="shrink-0 text-right">
+                {inc.durationMin != null ? (
+                  <span className="text-xs font-mono" style={{ color: t.textMuted }}>
+                    {inc.durationMin < 1 ? '< 1 min' : `${inc.durationMin} min`}
+                  </span>
+                ) : (
+                  <span className="text-xs font-mono" style={{ color: t.textFaint }}>—</span>
+                )}
+              </div>
             </div>
-            <div className="text-xs font-mono" style={{ color: t.textSecondary }}>
-              {inc.start ? formatTimestamp(inc.start) : '—'}
-              {inc.end && (
-                <span style={{ color: t.textFaint }}>
-                  {' — '}{formatTimestamp(inc.end)}
-                </span>
-              )}
-            </div>
-            {inc.error && (
-              <div className="mt-1 text-[10px] font-mono truncate" style={{ color: 'rgba(248,113,113,0.7)' }}
-                title={inc.error}>
-                {inc.error}
+
+            {/* Expanded detail */}
+            {isExpanded && (
+              <div className="px-5 py-3 border-l-2 border-t"
+                style={{
+                  borderLeftColor:   '#ef4444',
+                  borderTopColor:    t.metricGap,
+                  backgroundColor:   isDark ? 'rgba(239,68,68,0.06)' : 'rgba(239,68,68,0.03)',
+                }}>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs font-mono">
+                  <div>
+                    <span style={{ color: t.textFaint }}>Started</span>
+                    <div style={{ color: t.textSecondary }}>
+                      {inc.start ? new Date(inc.start).toLocaleString() : '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <span style={{ color: t.textFaint }}>Resolved</span>
+                    <div style={{ color: t.textSecondary }}>
+                      {inc.ongoing ? (
+                        <span style={{ color: '#f87171' }}>Ongoing</span>
+                      ) : inc.end ? (
+                        new Date(inc.end).toLocaleString()
+                      ) : '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <span style={{ color: t.textFaint }}>Duration</span>
+                    <div style={{ color: t.textSecondary }}>
+                      {inc.ongoing
+                        ? <span style={{ color: '#f87171' }}>Ongoing</span>
+                        : inc.durationMin != null
+                          ? `${inc.durationMin} minute${inc.durationMin !== 1 ? 's' : ''}`
+                          : '—'}
+                    </div>
+                  </div>
+                </div>
+                {inc.error && (
+                  <div className="mt-2.5 text-xs font-mono leading-relaxed"
+                    style={{ color: '#f87171' }}>
+                    {inc.error}
+                  </div>
+                )}
               </div>
             )}
           </div>
-          <div className="shrink-0 text-right">
-            {inc.durationMin != null ? (
-              <span className="text-xs font-mono" style={{ color: t.textMuted }}>
-                {inc.durationMin < 1 ? '< 1 min' : `${inc.durationMin} min`}
-              </span>
-            ) : (
-              <span className="text-xs font-mono" style={{ color: t.textFaint }}>—</span>
-            )}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -701,12 +831,12 @@ export function MonitorDetailModal({
 
           {/* History */}
           <div className={`absolute inset-0 overflow-y-auto ${activeTab === 'history' ? '' : 'hidden'}`}>
-            <HistoryTab history={history} t={t} />
+            <HistoryTab history={history} t={t} isDark={isDark} />
           </div>
 
           {/* Incidents */}
           <div className={`absolute inset-0 overflow-y-auto ${activeTab === 'incidents' ? '' : 'hidden'}`}>
-            <IncidentsTab history={history} t={t} />
+            <IncidentsTab history={history} t={t} isDark={isDark} />
           </div>
 
           {/* Configure — flex column so footer stays pinned */}

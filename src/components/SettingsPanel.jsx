@@ -341,7 +341,7 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
           {/* Version label — desktop only */}
           <div className="hidden sm:block px-5 py-5">
             <div className="text-xs font-mono" style={{ color: t.textFaint }}>
-              NetWatch v6.0
+              NetWatch v6.2.1
             </div>
           </div>
         </aside>

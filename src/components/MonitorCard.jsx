@@ -237,8 +237,8 @@ function PingMetric({ ping, trend, hovered, isDark, t }) {
     :               '#f87171';
   const barPct = hasValue ? Math.max(3, 100 - Math.min(100, (ping / 1000) * 100)) : 0;
   const tileBg = isDark
-    ? (hovered ? 'rgba(255,255,255,0.04)' : t.cardBg)
-    : (hovered ? 'rgba(0,0,0,0.03)'       : t.cardBg);
+    ? (hovered ? 'rgba(255,255,255,0.025)' : t.cardBg)
+    : (hovered ? 'rgba(0,0,0,0.015)'       : t.cardBg);
   const trendColor = trend?.direction === 'faster' ? '#4ade80' : '#f87171';
 
   return (
@@ -273,8 +273,8 @@ function UptimeMetric({ uptimePercent, hasHistory, trend, hovered, isDark, t }) 
     :                       '#f87171';
   const barPct = hasHistory ? uptimePercent : 0;
   const tileBg = isDark
-    ? (hovered ? 'rgba(255,255,255,0.04)' : t.cardBg)
-    : (hovered ? 'rgba(0,0,0,0.03)'       : t.cardBg);
+    ? (hovered ? 'rgba(255,255,255,0.025)' : t.cardBg)
+    : (hovered ? 'rgba(0,0,0,0.015)'       : t.cardBg);
   const trendColor = trend?.direction === 'up' ? '#4ade80' : '#f87171';
 
   return (
