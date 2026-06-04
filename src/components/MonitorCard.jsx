@@ -4,6 +4,7 @@ import { AreaChart, Area, YAxis, ReferenceLine, ResponsiveContainer, Tooltip } f
 import { Edit2, Tag, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { formatInterval, formatTimestamp, certDaysColor } from '../types/monitor';
 import { useTheme } from '../hooks/useTheme';
+import { TimingRow } from './TimingRow';
 
 // ---------------------------------------------------------------------------
 // Status dot
@@ -140,7 +141,6 @@ const SparkDot = ({ cx, cy, payload, index, onZoom }) => {
     return (
       <g key={`d-${index}`}>
         {onZoom && (
-          // Larger transparent hit area for easy clicking on mobile/desktop
           <circle
             cx={cx} cy={cy} r={10}
             fill="transparent"
@@ -155,39 +155,6 @@ const SparkDot = ({ cx, cy, payload, index, onZoom }) => {
   }
   return <circle key={`u-${index}`} cx={cx} cy={cy} r={0} fill="none" />;
 };
-
-// ---------------------------------------------------------------------------
-// Timing breakdown row beneath the card header (HTTP only)
-// ---------------------------------------------------------------------------
-
-function TimingRow({ latest }) {
-  const { t } = useTheme();
-  if (!latest || latest.dnsMs == null) return null;
-  return (
-    <div className="px-3 pb-2 flex items-center gap-3 flex-wrap">
-      <TimingChip label="DNS"  value={latest.dnsMs}  color="#3b82f6" t={t} />
-      <TimingChip label="TCP"  value={latest.tcpMs}  color="#22c55e" t={t} />
-      {latest.tlsMs  != null && <TimingChip label="TLS"  value={latest.tlsMs}  color="#f59e0b" t={t} />}
-      <TimingChip label="TTFB" value={latest.ttfbMs} color="#a78bfa" t={t} />
-      {latest.httpStatus != null && (
-        <span className={`text-xs font-mono ml-auto ${latest.httpStatus < 400 ? 'text-green-400/70' : 'text-red-400'}`}>
-          HTTP {latest.httpStatus}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function TimingChip({ label, value, color, t }) {
-  if (value == null) return null;
-  return (
-    <span className="text-xs font-mono flex items-center gap-0.5">
-      <span style={{ color: t.textFaint }}>{label} </span>
-      <span style={{ color }}>{value}</span>
-      <span style={{ color: t.textFaint }}>ms</span>
-    </span>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // SSL cert badge
@@ -223,27 +190,69 @@ function CheckTypeBadge({ checkType }) {
 }
 
 // ---------------------------------------------------------------------------
+// Trend computation — split history into two halves, compare averages
+// ---------------------------------------------------------------------------
+
+function computeTrend(history) {
+  if (!history || history.length < 6) return { ping: null, uptime: null };
+  const mid    = Math.floor(history.length / 2);
+  const first  = history.slice(0, mid);
+  const second = history.slice(mid);
+
+  // Ping trend
+  const fp = first.map(h => h.ping).filter(p => p != null);
+  const sp = second.map(h => h.ping).filter(p => p != null);
+  let ping = null;
+  if (fp.length >= 3 && sp.length >= 3) {
+    const fa = fp.reduce((s, v) => s + v, 0) / fp.length;
+    const sa = sp.reduce((s, v) => s + v, 0) / sp.length;
+    const d  = Math.round(sa - fa);
+    if (Math.abs(d) >= 2) ping = { delta: Math.abs(d), direction: d < 0 ? 'faster' : 'slower' };
+  }
+
+  // Uptime trend
+  const toU = h => h.uptimePct ?? (h.status === 'up' ? 100 : h.status === 'down' ? 0 : null);
+  const fu  = first.map(toU).filter(v => v != null);
+  const su  = second.map(toU).filter(v => v != null);
+  let uptime = null;
+  if (fu.length >= 3 && su.length >= 3) {
+    const fa = fu.reduce((s, v) => s + v, 0) / fu.length;
+    const sa = su.reduce((s, v) => s + v, 0) / su.length;
+    const d  = Math.round((sa - fa) * 10) / 10;
+    if (Math.abs(d) >= 0.1) uptime = { delta: Math.abs(d), direction: d > 0 ? 'up' : 'down' };
+  }
+
+  return { ping, uptime };
+}
+
+// ---------------------------------------------------------------------------
 // Ping metric cell — inverted bar (full = fast, empty = slow)
 // ---------------------------------------------------------------------------
 
-function PingMetric({ ping, t }) {
+function PingMetric({ ping, trend, hovered, isDark, t }) {
   const hasValue = ping != null;
   const color = !hasValue ? t.textFaint
     : ping < 100  ? '#4ade80'
     : ping < 300  ? '#fbbf24'
     :               '#f87171';
-  // Inverted: 0ms = 100% bar, 1000ms+ = ~0% bar
   const barPct = hasValue ? Math.max(3, 100 - Math.min(100, (ping / 1000) * 100)) : 0;
+  const tileBg = isDark
+    ? (hovered ? 'rgba(255,255,255,0.04)' : t.cardBg)
+    : (hovered ? 'rgba(0,0,0,0.03)'       : t.cardBg);
+  const trendColor = trend?.direction === 'faster' ? '#4ade80' : '#f87171';
 
   return (
-    <div className="px-3 py-3" style={{ backgroundColor: t.cardBg }}>
-      <div className="text-xs font-mono uppercase tracking-wider mb-1.5"
-        style={{ color: t.textFaint }}>
+    <div className="px-3 py-3" style={{ backgroundColor: tileBg, transition: 'background-color 150ms ease' }}>
+      <div className="text-xs font-mono uppercase tracking-wider mb-1.5" style={{ color: t.textFaint }}>
         Ping
       </div>
-      <div className="text-lg font-mono font-bold leading-none mb-2"
+      <div className="text-lg font-mono font-bold leading-none mb-1"
         style={{ color: hasValue ? color : t.textFaint }}>
         {hasValue ? `${ping}ms` : '—'}
+      </div>
+      {/* Fixed-height trend slot keeps tile height consistent whether or not trend data is present */}
+      <div className="h-[14px] text-[10px] font-mono opacity-75 mb-1.5" style={{ color: trendColor }}>
+        {trend ? `${trend.direction === 'faster' ? '↓' : '↑'} ${trend.delta}ms` : ''}
       </div>
       <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: t.metricGap }}>
         <div className="h-full rounded-full transition-all duration-700"
@@ -257,22 +266,29 @@ function PingMetric({ ping, t }) {
 // Uptime metric cell — bar fills with uptime %
 // ---------------------------------------------------------------------------
 
-function UptimeMetric({ uptimePercent, hasHistory, t }) {
+function UptimeMetric({ uptimePercent, hasHistory, trend, hovered, isDark, t }) {
   const color = !hasHistory ? t.textFaint
     : uptimePercent >= 99 ? '#4ade80'
     : uptimePercent >= 95 ? '#fbbf24'
     :                       '#f87171';
   const barPct = hasHistory ? uptimePercent : 0;
+  const tileBg = isDark
+    ? (hovered ? 'rgba(255,255,255,0.04)' : t.cardBg)
+    : (hovered ? 'rgba(0,0,0,0.03)'       : t.cardBg);
+  const trendColor = trend?.direction === 'up' ? '#4ade80' : '#f87171';
 
   return (
-    <div className="px-3 py-3" style={{ backgroundColor: t.cardBg }}>
-      <div className="text-xs font-mono uppercase tracking-wider mb-1.5"
-        style={{ color: t.textFaint }}>
+    <div className="px-3 py-3" style={{ backgroundColor: tileBg, transition: 'background-color 150ms ease' }}>
+      <div className="text-xs font-mono uppercase tracking-wider mb-1.5" style={{ color: t.textFaint }}>
         Uptime
       </div>
-      <div className="text-lg font-mono font-bold leading-none mb-2"
+      <div className="text-lg font-mono font-bold leading-none mb-1"
         style={{ color: hasHistory ? color : t.textFaint }}>
         {hasHistory ? `${uptimePercent}%` : '—'}
+      </div>
+      {/* Fixed-height trend slot */}
+      <div className="h-[14px] text-[10px] font-mono opacity-75 mb-1.5" style={{ color: trendColor }}>
+        {trend ? `${trend.direction === 'up' ? '↑' : '↓'} ${trend.delta}%` : ''}
       </div>
       <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: t.metricGap }}>
         <div className="h-full rounded-full transition-all duration-700"
@@ -301,12 +317,12 @@ function MonitorCardInner({
     []
   );
 
-  // Memoised dot renderer — closes over onZoomToPoint so Recharts re-uses it
-  // without triggering unnecessary chart re-renders.
   const dotRenderer = useMemo(
     () => (props) => <SparkDot {...props} onZoom={onZoomToPoint} />,
     [onZoomToPoint]
   );
+
+  const trend = useMemo(() => computeTrend(monitor.history), [monitor.history]);
 
   const chartData = monitor.history.map((h, i) => ({
     i,
@@ -425,7 +441,6 @@ function MonitorCardInner({
         style={{ cursor: dragHandleProps ? 'grab' : 'default' }}
         {...(dragHandleProps || {})}>
 
-        {/* Label row: status dot + label + type badge + edit button */}
         <div className="flex items-center gap-2">
           <StatusDot status={displayStatus} />
           <span className="text-sm font-semibold leading-snug flex-1 truncate min-w-0"
@@ -473,13 +488,21 @@ function MonitorCardInner({
         )}
       </div>
 
-      {/* ── Metrics row: ping + uptime with progress bars ── */}
+      {/* ── Metrics row: ping + uptime ── */}
       <div className="grid grid-cols-2 gap-px border-t border-b"
         style={{ backgroundColor: t.metricGap, borderColor: t.metricGap }}>
-        <PingMetric ping={monitor.currentPing} t={t} />
+        <PingMetric
+          ping={monitor.currentPing}
+          trend={trend.ping}
+          hovered={hovered}
+          isDark={isDark}
+          t={t} />
         <UptimeMetric
           uptimePercent={monitor.uptimePercent}
           hasHistory={monitor.history.length > 0}
+          trend={trend.uptime}
+          hovered={hovered}
+          isDark={isDark}
           t={t} />
       </div>
 
