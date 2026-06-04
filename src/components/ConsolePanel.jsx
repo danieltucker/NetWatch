@@ -5,20 +5,26 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 // ---------------------------------------------------------------------------
 
 const CMDS = {
-  help:       { usage: 'help [cmd]',          desc: 'List commands or show help for a command' },
-  clear:      { usage: 'clear',               desc: 'Clear console output' },
-  monitors:   { usage: 'monitors',            desc: 'List all monitors with current status' },
-  ls:         { usage: 'ls',                  desc: 'Alias for monitors' },
-  status:     { usage: 'status <name>',       desc: 'Show details for a named monitor' },
-  check:      { usage: 'check <name>',        desc: 'Trigger an immediate check' },
-  refresh:    { usage: 'refresh',             desc: 'Re-fetch all monitor data' },
-  ping:       { usage: 'ping <target>',       desc: 'ICMP ping a host' },
-  dns:        { usage: 'dns <domain>',        desc: 'Look up DNS records (A, AAAA, MX, TXT, NS)' },
-  traceroute: { usage: 'traceroute <target>', desc: 'Trace network path to a host' },
-  trace:      { usage: 'trace <target>',      desc: 'Alias for traceroute' },
-  uptime:     { usage: 'uptime <name>',       desc: 'Show uptime % for a monitor' },
-  history:    { usage: 'history <name>',      desc: 'Show recent check history for a monitor' },
-  version:    { usage: 'version',             desc: 'Show WatchTower version' },
+  help:      { usage: 'help [cmd]',          desc: 'List commands or show help for a command' },
+  clear:     { usage: 'clear',               desc: 'Clear console output' },
+  monitors:  { usage: 'monitors',            desc: 'List all monitors with current status' },
+  ls:        { usage: 'ls',                  desc: 'Alias for monitors' },
+  down:      { usage: 'down',                desc: 'List monitors that are currently down or degraded' },
+  summary:   { usage: 'summary',             desc: 'Overall health: counts by status and average uptime' },
+  status:    { usage: 'status <name>',       desc: 'Show details for a named monitor' },
+  check:     { usage: 'check <name>',        desc: 'Trigger an immediate check' },
+  refresh:   { usage: 'refresh',             desc: 'Re-fetch all monitor data' },
+  ping:      { usage: 'ping <target>',       desc: 'ICMP ping a host' },
+  dns:       { usage: 'dns <domain>',        desc: 'Look up DNS records (A, AAAA, MX, TXT, NS)' },
+  traceroute:{ usage: 'traceroute <target>', desc: 'Trace network path to a host' },
+  trace:     { usage: 'trace <target>',      desc: 'Alias for traceroute' },
+  uptime:    { usage: 'uptime <name>',       desc: 'Show uptime % for a monitor' },
+  history:   { usage: 'history <name>',      desc: 'Show recent check history for a monitor' },
+  incidents: { usage: 'incidents <name>',    desc: 'Show recent down-state transitions for a monitor' },
+  ssl:       { usage: 'ssl <name>',          desc: 'Show SSL certificate status for a monitor' },
+  open:      { usage: 'open <name>',         desc: 'Open monitor target URL in browser' },
+  tags:      { usage: 'tags',                desc: 'List all tags and which monitors use each' },
+  version:   { usage: 'version',             desc: 'Show NetWatch version' },
 };
 
 const MAX_USAGE = Math.max(...Object.values(CMDS).map(c => c.usage.length));
@@ -42,12 +48,12 @@ function ConsoleLine({ type, text }) {
   }
   return (
     <div style={{
-      color:         LINE_COLORS[type] ?? LINE_COLORS.output,
-      lineHeight:    1.65,
-      whiteSpace:    'pre-wrap',
-      wordBreak:     'break-all',
-      display:       'flex',
-      gap:           8,
+      color:      LINE_COLORS[type] ?? LINE_COLORS.output,
+      lineHeight: 1.65,
+      whiteSpace: 'pre-wrap',
+      wordBreak:  'break-all',
+      display:    'flex',
+      gap:         8,
     }}>
       {type === 'command' && (
         <span style={{ color: '#4ade80', userSelect: 'none', flexShrink: 0 }}>$</span>
@@ -75,6 +81,31 @@ function pad(str, len) {
   return String(str).padEnd(len);
 }
 
+function certColor(days) {
+  return days > 30 ? '#4ade80' : days > 7 ? '#fbbf24' : '#f87171';
+}
+
+// Walk history chronologically and extract down→up incident transitions.
+function extractIncidents(history) {
+  const incidents = [];
+  let start = null, startIdx = null;
+  for (let i = 0; i < history.length; i++) {
+    const isDown = history[i].status === 'down';
+    if (isDown && start === null) { start = history[i].timestamp; startIdx = i; }
+    else if (!isDown && start !== null) {
+      const durationMin = Math.max(1, Math.round(
+        (new Date(history[i].timestamp) - new Date(start)) / 60000
+      ));
+      incidents.push({ start, end: history[i].timestamp, durationMin, error: history[startIdx]?.error ?? null });
+      start = null; startIdx = null;
+    }
+  }
+  if (start !== null) {
+    incidents.push({ start, end: null, durationMin: null, error: history[startIdx]?.error ?? null });
+  }
+  return incidents.reverse();
+}
+
 // ---------------------------------------------------------------------------
 // ConsolePanel
 // ---------------------------------------------------------------------------
@@ -82,21 +113,21 @@ function pad(str, len) {
 export function ConsolePanel({ monitors = [], onRefresh }) {
   const [isOpen,  setIsOpen]  = useState(false);
   const [input,   setInput]   = useState('');
-  const [cmdHist, setCmdHist] = useState([]);   // saved commands, newest first
-  const [histIdx, setHistIdx] = useState(-1);   // -1 = current draft
+  const [cmdHist, setCmdHist] = useState([]);
+  const [histIdx, setHistIdx] = useState(-1);
   const [lines,   setLines]   = useState([
-    { type: 'info', text: 'WatchTower Console  —  type "help" for available commands' },
+    { type: 'info', text: 'NetWatch Console  —  type "help" for available commands' },
   ]);
 
   const outputRef = useRef(null);
   const inputRef  = useRef(null);
 
-  // ── Global keyboard handler ─────────────────────────────────────────────────
+  // ── Global keyboard handler ──────────────────────────────────────────────
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === '`') {
         const inField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName);
-        if (!isOpen && inField) return; // don't intercept form typing
+        if (!isOpen && inField) return;
         e.preventDefault();
         setIsOpen(v => !v);
       }
@@ -106,7 +137,7 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [isOpen]);
 
-  // ── Focus input when opened, lock body scroll ───────────────────────────────
+  // ── Focus + body scroll lock ─────────────────────────────────────────────
   useEffect(() => {
     if (isOpen) {
       inputRef.current?.focus();
@@ -117,25 +148,23 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
     return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
 
-  // ── Auto-scroll output to bottom ────────────────────────────────────────────
+  // ── Auto-scroll ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (outputRef.current) {
       outputRef.current.scrollTop = outputRef.current.scrollHeight;
     }
   }, [lines]);
 
-  // ── Append lines helper ─────────────────────────────────────────────────────
   const emit = useCallback((newLines) => {
     setLines(prev => [...prev, ...(Array.isArray(newLines) ? newLines : [newLines])]);
   }, []);
 
-  // ── Tab completion ──────────────────────────────────────────────────────────
+  // ── Tab completion ───────────────────────────────────────────────────────
   const handleTab = useCallback(() => {
     const parts = input.split(/\s+/);
     if (parts.length < 2) return;
     const partial = parts[parts.length - 1].toLowerCase();
     if (!partial) return;
-
     const matches = monitors.map(m => m.label).filter(l => l.toLowerCase().startsWith(partial));
     if (matches.length === 1) {
       parts[parts.length - 1] = matches[0];
@@ -145,7 +174,7 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
     }
   }, [input, monitors, emit]);
 
-  // ── Input key handler ───────────────────────────────────────────────────────
+  // ── Input key handler ────────────────────────────────────────────────────
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter') {
       const val = input.trim();
@@ -171,7 +200,7 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
     }
   }, [input, histIdx, cmdHist, handleTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Command executor ────────────────────────────────────────────────────────
+  // ── Command executor ─────────────────────────────────────────────────────
   const runCommand = useCallback(async (raw) => {
     emit({ type: 'command', text: raw });
 
@@ -181,23 +210,20 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
     try {
       switch (cmd.toLowerCase()) {
 
-        // ── clear ──────────────────────────────────────────────────────────
+        // ── clear ────────────────────────────────────────────────────────
         case 'clear':
           setLines([]);
           break;
 
-        // ── version ────────────────────────────────────────────────────────
+        // ── version ──────────────────────────────────────────────────────
         case 'version':
-          emit({ type: 'output', text: 'NetWatch v6.4.1' });
+          emit({ type: 'output', text: 'NetWatch v6.4.2' });
           break;
 
-        // ── help ───────────────────────────────────────────────────────────
+        // ── help ─────────────────────────────────────────────────────────
         case 'help': {
           const target = arg ? CMDS[arg.toLowerCase()] : null;
-          if (arg && !target) {
-            emit({ type: 'error', text: `Unknown command: ${arg}` });
-            break;
-          }
+          if (arg && !target) { emit({ type: 'error', text: `Unknown command: ${arg}` }); break; }
           if (target) {
             emit([
               { type: 'output', text: `Usage:  ${target.usage}` },
@@ -215,7 +241,7 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
           break;
         }
 
-        // ── monitors / ls ──────────────────────────────────────────────────
+        // ── monitors / ls ────────────────────────────────────────────────
         case 'monitors':
         case 'ls': {
           if (!monitors.length) { emit({ type: 'warn', text: 'No monitors configured' }); break; }
@@ -232,12 +258,57 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
           break;
         }
 
-        // ── status ─────────────────────────────────────────────────────────
+        // ── down ─────────────────────────────────────────────────────────
+        case 'down': {
+          const affected = monitors.filter(m => m.status === 'down' || m.status === 'degraded');
+          if (!affected.length) {
+            emit({ type: 'success', text: 'All monitors healthy' });
+            break;
+          }
+          emit([
+            { type: 'divider' },
+            ...affected.map(m => ({
+              type: m.status === 'down' ? 'error' : 'warn',
+              text: `  [${pad(m.status.toUpperCase(), 8)}]  ${pad(m.label, 24)}  ${m.target}`,
+            })),
+            { type: 'divider' },
+            { type: 'warn', text: `${affected.length} monitor(s) need attention` },
+          ]);
+          break;
+        }
+
+        // ── summary ──────────────────────────────────────────────────────
+        case 'summary': {
+          if (!monitors.length) { emit({ type: 'warn', text: 'No monitors configured' }); break; }
+          const upCount       = monitors.filter(m => m.status === 'up').length;
+          const downCount     = monitors.filter(m => m.status === 'down').length;
+          const degradedCount = monitors.filter(m => m.status === 'degraded').length;
+          const withHistory   = monitors.filter(m => m.history?.length > 0);
+          const avgUptime     = withHistory.length
+            ? (withHistory.reduce((s, m) => s + (m.uptimePercent ?? 0), 0) / withHistory.length).toFixed(1)
+            : null;
+          const upPct = monitors.length ? Math.round((upCount / monitors.length) * 100) : 0;
+          emit([
+            { type: 'divider' },
+            { type: 'output',  text: `  Monitors   ${monitors.length} total` },
+            { type: 'success', text: `  Up         ${upCount}  (${upPct}%)` },
+            ...(degradedCount > 0 ? [{ type: 'warn',  text: `  Degraded   ${degradedCount}` }] : []),
+            ...(downCount > 0     ? [{ type: 'error', text: `  Down       ${downCount}` }]     : []),
+            { type: avgUptime && parseFloat(avgUptime) >= 99 ? 'success' : 'output',
+              text: `  Avg uptime ${avgUptime != null ? `${avgUptime}%` : '—'}` },
+            { type: 'divider' },
+          ]);
+          break;
+        }
+
+        // ── status ───────────────────────────────────────────────────────
         case 'status': {
           if (!arg) { emit({ type: 'error', text: 'Usage: status <name>' }); break; }
           const m = findMonitor(monitors, arg);
           if (!m) { emit({ type: 'error', text: `No monitor matching "${arg}"` }); break; }
-          const tags = m.tags?.filter(t => t !== '_ref') ?? [];
+          const tags      = m.tags?.filter(t => t !== '_ref') ?? [];
+          const certDays  = m.latest?.certDays;
+          const alertList = (m.alertTypes ?? []).filter(a => a !== 'None');
           emit([
             { type: 'divider' },
             { type: 'output', text: `  Label     ${m.label}` },
@@ -246,6 +317,14 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
             { type: 'output', text: `  Status    ${(m.status ?? 'pending').toUpperCase()}` },
             { type: 'output', text: `  Ping      ${m.currentPing != null ? `${m.currentPing}ms` : '—'}` },
             { type: 'output', text: `  Uptime    ${m.history?.length > 0 ? `${m.uptimePercent}%` : '—'}  (${m.historyWindow ?? '1h'} window)` },
+            ...(certDays != null ? [{
+              type: 'output',
+              text: `  Cert      ${certDays}d remaining`,
+            }] : []),
+            ...(alertList.length > 0 ? [{
+              type: 'info',
+              text: `  Alerts    ${alertList.join(', ')}`,
+            }] : []),
             { type: 'output', text: `  Interval  every ${m.interval}s` },
             { type: 'output', text: `  Checked   ${m.lastChecked ?? 'never'}` },
             ...(tags.length > 0 ? [{ type: 'info', text: `  Tags      ${tags.join(', ')}` }] : []),
@@ -254,7 +333,7 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
           break;
         }
 
-        // ── uptime ─────────────────────────────────────────────────────────
+        // ── uptime ───────────────────────────────────────────────────────
         case 'uptime': {
           if (!arg) { emit({ type: 'error', text: 'Usage: uptime <name>' }); break; }
           const m = findMonitor(monitors, arg);
@@ -264,7 +343,7 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
           break;
         }
 
-        // ── history ────────────────────────────────────────────────────────
+        // ── history ──────────────────────────────────────────────────────
         case 'history': {
           if (!arg) { emit({ type: 'error', text: 'Usage: history <name>' }); break; }
           const m = findMonitor(monitors, arg);
@@ -274,13 +353,15 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
           emit([
             { type: 'divider' },
             ...entries.map(h => {
-              const ts = h.timestamp
+              const ts   = h.timestamp
                 ? new Date(h.timestamp).toLocaleTimeString('en-US', { hour12: false })
                 : '—';
               const ping = h.ping != null ? `${h.ping}ms` : '—';
+              const http = h.httpStatus != null ? `HTTP ${h.httpStatus}` : '—';
+              const httpColor = h.httpStatus != null && h.httpStatus < 400 ? 'success' : 'error';
               return {
-                type: h.status === 'up' ? 'success' : 'error',
-                text: `  ${ts}  ${pad(h.status?.toUpperCase() ?? '?', 4)}  ${ping}`,
+                type: h.status === 'up' ? 'success' : h.httpStatus != null ? httpColor : 'error',
+                text: `  ${ts}  ${pad(h.status?.toUpperCase() ?? '?', 4)}  ${pad(ping, 8)}  ${http}`,
               };
             }),
             { type: 'divider' },
@@ -288,26 +369,121 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
           break;
         }
 
-        // ── check ──────────────────────────────────────────────────────────
+        // ── incidents ────────────────────────────────────────────────────
+        case 'incidents': {
+          if (!arg) { emit({ type: 'error', text: 'Usage: incidents <name>' }); break; }
+          const m = findMonitor(monitors, arg);
+          if (!m) { emit({ type: 'error', text: `No monitor matching "${arg}"` }); break; }
+          const all = extractIncidents(m.history ?? []).slice(0, 10);
+          if (!all.length) {
+            emit({ type: 'success', text: `No incidents in the current window for "${m.label}"` });
+            break;
+          }
+          const fmtTs = ts => ts
+            ? new Date(ts).toLocaleString('en-US', {
+                hour12: false, month: 'short', day: 'numeric',
+                hour: '2-digit', minute: '2-digit',
+              })
+            : '—';
+          const lines = [];
+          lines.push({ type: 'divider' });
+          for (const inc of all) {
+            lines.push({ type: 'error',  text: `  Down at   ${fmtTs(inc.start)}` });
+            if (inc.end) {
+              lines.push({ type: 'success', text: `  Recovered ${fmtTs(inc.end)}  (${inc.durationMin} min)` });
+            } else {
+              lines.push({ type: 'warn', text: `  Ongoing` });
+            }
+            if (inc.error) lines.push({ type: 'output', text: `  Error     ${inc.error}` });
+            lines.push({ type: 'divider' });
+          }
+          lines.push({ type: 'info', text: `${all.length} incident(s)` });
+          emit(lines);
+          break;
+        }
+
+        // ── ssl ──────────────────────────────────────────────────────────
+        case 'ssl': {
+          if (!arg) { emit({ type: 'error', text: 'Usage: ssl <name>' }); break; }
+          const m = findMonitor(monitors, arg);
+          if (!m) { emit({ type: 'error', text: `No monitor matching "${arg}"` }); break; }
+          const days = m.latest?.certDays;
+          if (days == null) {
+            emit({ type: 'warn', text: 'No SSL data available (HTTP/API monitor only, requires at least one check)' });
+            break;
+          }
+          emit([
+            { type: 'divider' },
+            { type: days > 30 ? 'success' : days > 7 ? 'warn' : 'error',
+              text: `  Cert expires in   ${days}d` },
+            { type: 'output', text: `  Last checked      ${m.lastChecked ?? 'never'}` },
+            { type: 'divider' },
+          ]);
+          break;
+        }
+
+        // ── open ─────────────────────────────────────────────────────────
+        case 'open': {
+          if (!arg) { emit({ type: 'error', text: 'Usage: open <name>' }); break; }
+          const m = findMonitor(monitors, arg);
+          if (!m) { emit({ type: 'error', text: `No monitor matching "${arg}"` }); break; }
+          if (m.checkType !== 'http' && m.checkType !== 'api') {
+            emit({ type: 'warn', text: 'open only works for HTTP and API monitors' });
+            break;
+          }
+          const href = m.target.startsWith('http') ? m.target : `https://${m.target}`;
+          window.open(href, '_blank', 'noopener,noreferrer');
+          emit({ type: 'success', text: `Opened ${href}` });
+          break;
+        }
+
+        // ── tags ─────────────────────────────────────────────────────────
+        case 'tags': {
+          const tagMap = new Map();
+          for (const m of monitors) {
+            for (const tag of (m.tags ?? []).filter(t => t !== '_ref')) {
+              if (!tagMap.has(tag)) tagMap.set(tag, []);
+              tagMap.get(tag).push(m.label);
+            }
+          }
+          if (!tagMap.size) { emit({ type: 'warn', text: 'No tags configured' }); break; }
+          const maxTag = Math.max(...[...tagMap.keys()].map(t => t.length));
+          emit([
+            { type: 'divider' },
+            ...[...tagMap.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([tag, labels]) => ({
+              type: 'output',
+              text: `  ${pad(tag, maxTag + 2)}→  ${labels.join(', ')}`,
+            })),
+            { type: 'divider' },
+          ]);
+          break;
+        }
+
+        // ── check ────────────────────────────────────────────────────────
         case 'check': {
           if (!arg) { emit({ type: 'error', text: 'Usage: check <name>' }); break; }
           const m = findMonitor(monitors, arg);
           if (!m) { emit({ type: 'error', text: `No monitor matching "${arg}"` }); break; }
           emit({ type: 'info', text: `Checking "${m.label}"…` });
-          const res = await fetch(`/api/monitors/${m.id}/check`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+          const res  = await fetch(`/api/monitors/${m.id}/check`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
           });
           const data = await res.json();
           if (data.status === 'up') {
-            emit({ type: 'success', text: `UP  ${data.totalMs != null ? `${data.totalMs}ms` : ''}` });
+            const lines = [{ type: 'success', text: `UP  ${data.totalMs != null ? `${data.totalMs}ms` : ''}` }];
+            if (data.dnsMs  != null) lines.push({ type: 'output', text: `  DNS   ${data.dnsMs}ms` });
+            if (data.tcpMs  != null) lines.push({ type: 'output', text: `  TCP   ${data.tcpMs}ms` });
+            if (data.tlsMs  != null) lines.push({ type: 'output', text: `  TLS   ${data.tlsMs}ms` });
+            if (data.ttfbMs != null) lines.push({ type: 'output', text: `  TTFB  ${data.ttfbMs}ms` });
+            if (data.httpStatus != null) lines.push({ type: data.httpStatus < 400 ? 'success' : 'error', text: `  HTTP ${data.httpStatus}` });
+            emit(lines);
           } else {
             emit({ type: 'error', text: `DOWN  ${data.error ?? 'Unreachable'}` });
           }
           break;
         }
 
-        // ── refresh ────────────────────────────────────────────────────────
+        // ── refresh ──────────────────────────────────────────────────────
         case 'refresh': {
           emit({ type: 'info', text: 'Refreshing…' });
           await (onRefresh?.() ?? Promise.resolve());
@@ -315,13 +491,12 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
           break;
         }
 
-        // ── ping ───────────────────────────────────────────────────────────
+        // ── ping ─────────────────────────────────────────────────────────
         case 'ping': {
           if (!arg) { emit({ type: 'error', text: 'Usage: ping <target>' }); break; }
           emit({ type: 'info', text: `Pinging ${arg}…` });
-          const res = await fetch('/api/tools/ping', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+          const res  = await fetch('/api/tools/ping', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ target: arg }),
           });
           const data = await res.json();
@@ -332,13 +507,12 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
           break;
         }
 
-        // ── dns ────────────────────────────────────────────────────────────
+        // ── dns ──────────────────────────────────────────────────────────
         case 'dns': {
           if (!arg) { emit({ type: 'error', text: 'Usage: dns <domain>' }); break; }
           emit({ type: 'info', text: `Looking up ${arg}…` });
-          const res = await fetch('/api/tools/dns', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+          const res  = await fetch('/api/tools/dns', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ domain: arg }),
           });
           const data = await res.json();
@@ -355,26 +529,20 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
           break;
         }
 
-        // ── traceroute / trace ─────────────────────────────────────────────
+        // ── traceroute / trace ────────────────────────────────────────────
         case 'traceroute':
         case 'trace': {
           if (!arg) { emit({ type: 'error', text: `Usage: ${cmd} <target>` }); break; }
           emit({ type: 'info', text: `Tracing route to ${arg}…` });
-          const res = await fetch('/api/tools/traceroute', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+          const res  = await fetch('/api/tools/traceroute', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ target: arg }),
           });
           const data = await res.json();
-          if (data.error && !data.hops?.length) {
-            emit({ type: 'error', text: data.error });
-            break;
-          }
+          if (data.error && !data.hops?.length) { emit({ type: 'error', text: data.error }); break; }
           const hopLines = (data.hops ?? []).map(h => ({
             type: 'output',
-            text: `  ${pad(h.hop, 3)}  ${
-              h.address ?? '*          '
-            }  ${
+            text: `  ${pad(h.hop, 3)}  ${h.address ?? '*          '}  ${
               h.times ? h.times.map(t => pad(`${t}ms`, 7)).join('  ') : '*        *        *'
             }`,
           }));
@@ -387,7 +555,7 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
           break;
         }
 
-        // ── unknown ────────────────────────────────────────────────────────
+        // ── unknown ───────────────────────────────────────────────────────
         default:
           emit({ type: 'error', text: `Unknown command: ${cmd}  (type "help" to list commands)` });
       }
@@ -396,7 +564,7 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
     }
   }, [monitors, onRefresh, emit]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{
       position:        'fixed',
@@ -428,7 +596,7 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
         flexShrink:       0,
       }}>
         <span style={{ color: '#4ade80', fontWeight: 'bold', letterSpacing: '0.12em', fontSize: 11 }}>
-          WATCHTOWER CONSOLE
+          NETWATCH CONSOLE
         </span>
         <span style={{ color: '#30363d', fontSize: 11 }}>
           ` to close  ·  tab to complete  ·  ↑↓ history
@@ -437,12 +605,12 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
 
       {/* Output area */}
       <div ref={outputRef} style={{
-        flex:       1,
-        overflowY:  'auto',
-        padding:    '10px 16px 6px',
-        display:    'flex',
+        flex:          1,
+        overflowY:     'auto',
+        padding:       '10px 16px 6px',
+        display:       'flex',
         flexDirection: 'column',
-        gap:        1,
+        gap:            1,
       }}>
         {lines.map((line, i) => (
           <ConsoleLine key={i} type={line.type} text={line.text} />
@@ -466,14 +634,14 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           style={{
-            flex:           1,
-            background:    'transparent',
-            border:        'none',
-            outline:       'none',
-            color:         '#e6edf3',
-            fontFamily:    'inherit',
-            fontSize:      'inherit',
-            caretColor:    '#4ade80',
+            flex:       1,
+            background: 'transparent',
+            border:     'none',
+            outline:    'none',
+            color:      '#e6edf3',
+            fontFamily: 'inherit',
+            fontSize:   'inherit',
+            caretColor: '#4ade80',
           }}
           spellCheck={false}
           autoComplete="off"
