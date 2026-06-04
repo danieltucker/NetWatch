@@ -334,7 +334,7 @@ export default function App() {
             </span>
             <span className="hidden sm:inline text-xs font-mono px-2 py-0.5 rounded border"
               style={{ color: t.textFaint, borderColor: t.cardBorder }}>
-              netwatch · v6.3.0
+              netwatch · v6.4.0
             </span>
           </div>
 
@@ -554,7 +554,7 @@ export default function App() {
                       <SortableMonitorCard
                         key={m.id}
                         monitor={m}
-                        onEdit={mon => openDetail(mon, 'edit')}
+                        onEdit={mon => openDetail(mon, 'configure')}
                         onCardClick={mon => openDetail(mon, 'history')}
                         onZoomToPoint={handleZoomToIncident}
                         width={getWidth(m.id)}

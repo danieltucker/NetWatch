@@ -1,7 +1,7 @@
 import React, { useRef, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AreaChart, Area, YAxis, ReferenceLine, ResponsiveContainer, Tooltip } from 'recharts';
-import { Edit2, Tag, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Edit2, Tag, ShieldCheck, ShieldAlert, ExternalLink } from 'lucide-react';
 import { formatInterval, formatTimestamp, certDaysColor } from '../types/monitor';
 import { useTheme } from '../hooks/useTheme';
 import { UptimeBlocks } from './UptimeBlocks';
@@ -110,6 +110,14 @@ function SparkTooltipContent({ d, t }) {
               <span style={{ color: t.textMuted }}>Uptime</span>
               <span style={{ color: d.uptimePct === 100 ? '#4ade80' : d.uptimePct >= 95 ? '#fbbf24' : '#f87171' }}>
                 {d.uptimePct}%
+              </span>
+            </div>
+          )}
+          {d.httpStatus != null && (
+            <div className="mb-1.5 flex items-center gap-2">
+              <span style={{ color: t.textMuted }}>HTTP</span>
+              <span style={{ color: d.httpStatus < 400 ? 'rgba(74,222,128,0.7)' : '#f87171' }}>
+                {d.httpStatus}
               </span>
             </div>
           )}
@@ -224,9 +232,12 @@ function computeTrend(history) {
 // Ping metric cell
 // ---------------------------------------------------------------------------
 
-function PingMetric({ ping, trend, hovered, isDark, t }) {
+function PingMetric({ ping, trend, hovered, isDark, t, degradedThreshold }) {
   const hasValue = ping != null;
-  const color = !hasValue ? t.textFaint : ping < 100 ? '#4ade80' : ping < 300 ? '#fbbf24' : '#f87171';
+  const color = !hasValue ? t.textFaint
+    : degradedThreshold != null
+      ? (ping < degradedThreshold ? '#4ade80' : '#fbbf24')
+      : (ping < 200 ? '#4ade80' : ping < 500 ? '#fbbf24' : '#f87171');
   const barPct = hasValue ? Math.max(3, 100 - Math.min(100, (ping / 1000) * 100)) : 0;
   const tileBg = isDark ? (hovered ? 'rgba(255,255,255,0.025)' : t.cardBg)
                         : (hovered ? 'rgba(0,0,0,0.015)'       : t.cardBg);
@@ -297,6 +308,7 @@ function MonitorCardInner({
   const chartData = monitor.history.map((h, i) => ({
     i, ping: h.ping ?? 0, status: h.status, timestamp: h.timestamp,
     dnsMs: h.dnsMs, tcpMs: h.tcpMs, tlsMs: h.tlsMs, ttfbMs: h.ttfbMs,
+    httpStatus: h.httpStatus,
   }));
 
   const displayStatus =
@@ -405,21 +417,22 @@ function MonitorCardInner({
         {...(dragHandleProps || {})}>
         <div className="flex items-center gap-2">
           <StatusPill status={displayStatus} />
-          {(monitor.checkType === 'http' || monitor.checkType === 'api') ? (
-            <a href={monitor.target.startsWith('http') ? monitor.target : `https://${monitor.target}`}
-              target="_blank" rel="noopener noreferrer"
-              onClick={e => e.stopPropagation()}
-              title={monitor.target}
-              className="text-[15px] font-semibold leading-snug flex-1 truncate min-w-0 hover:underline"
-              style={{ color: t.textPrimary }}>
-              {monitor.label}
-            </a>
-          ) : (
-            <span className="text-[15px] font-semibold leading-snug flex-1 truncate min-w-0"
-              title={monitor.label} style={{ color: t.textPrimary }}>
-              {monitor.label}
-            </span>
-          )}
+          <span className="text-[15px] font-semibold leading-snug flex-1 truncate min-w-0"
+            title={monitor.label} style={{ color: t.textPrimary }}>
+            {monitor.label}
+          </span>
+          {(monitor.checkType === 'http' || monitor.checkType === 'api') && (() => {
+            const href = monitor.target.startsWith('http') ? monitor.target : `https://${monitor.target}`;
+            return (
+              <button
+                className="shrink-0 p-1 rounded transition-opacity opacity-30 hover:opacity-80"
+                title={monitor.target}
+                onClick={e => { e.stopPropagation(); window.open(href, '_blank', 'noopener,noreferrer'); }}
+                onPointerDown={e => e.stopPropagation()}>
+                <ExternalLink size={11} style={{ color: t.textSecondary }} />
+              </button>
+            );
+          })()}
           <CheckTypeBadge checkType={monitor.checkType} />
           {onEdit && (
             <button onClick={e => { e.stopPropagation(); onEdit(monitor); }}
@@ -440,7 +453,8 @@ function MonitorCardInner({
       {/* ── Metrics row ── */}
       <div className="grid grid-cols-2">
         <PingMetric   ping={monitor.currentPing} trend={trend.ping}
-          hovered={hovered} isDark={isDark} t={t} />
+          hovered={hovered} isDark={isDark} t={t}
+          degradedThreshold={monitor.degradedThreshold} />
         <UptimeMetric uptimePercent={monitor.uptimePercent} hasHistory={monitor.history.length > 0}
           trend={trend.uptime} hovered={hovered} isDark={isDark} t={t} />
       </div>
