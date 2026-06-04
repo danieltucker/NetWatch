@@ -81,7 +81,13 @@ export function useMonitors(historyWindow = '1h', historyRange = null) {
 
     es.addEventListener('monitor:updated', (e) => {
       const updated = JSON.parse(e.data);
-      setMonitors(prev => prev.map(m => m.id === updated.id ? updated : m));
+      setMonitors(prev => prev.map(m => {
+        if (m.id !== updated.id) return m;
+        // The SSE payload always uses the default 1h window. Preserve the
+        // current window's history so the chart doesn't jump when the user
+        // is viewing a different window (e.g. 6h or 1d).
+        return { ...updated, history: m.history, historyWindow: m.historyWindow };
+      }));
     });
 
     es.addEventListener('monitor:deleted', (e) => {

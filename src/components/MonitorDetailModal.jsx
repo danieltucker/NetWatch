@@ -13,7 +13,7 @@ import { formatTimestamp, formatInterval } from '../types/monitor';
 // ---------------------------------------------------------------------------
 
 const CHECK_TYPE_LABELS = { http: 'HTTP', api: 'API', tcp: 'TCP', icmp: 'ICMP' };
-const WINDOWS = ['1h', '6h', '1d', '1w'];
+const WINDOWS = ['15m', '1h', '6h', '12h', '1d', '1w', '30d'];
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -4,7 +4,6 @@ import { AreaChart, Area, YAxis, ReferenceLine, ResponsiveContainer, Tooltip } f
 import { Edit2, Tag, ShieldCheck, ShieldAlert, ExternalLink } from 'lucide-react';
 import { formatInterval, formatTimestamp, certDaysColor } from '../types/monitor';
 import { useTheme } from '../hooks/useTheme';
-import { UptimeBlocks } from './UptimeBlocks';
 
 // ---------------------------------------------------------------------------
 // Status pill — replaces the 8px dot on full cards
@@ -113,15 +112,16 @@ function SparkTooltipContent({ d, t }) {
               </span>
             </div>
           )}
-          {d.httpStatus != null && (
-            <div className="mb-1.5 flex items-center gap-2">
-              <span style={{ color: t.textMuted }}>HTTP</span>
-              <span style={{ color: d.httpStatus < 400 ? 'rgba(74,222,128,0.7)' : '#f87171' }}>
-                {d.httpStatus}
-              </span>
-            </div>
-          )}
         </>
+      )}
+      {/* HTTP status shown for both up and down states — failed status codes are useful when down */}
+      {d.httpStatus != null && (
+        <div className="mb-1.5 flex items-center gap-2">
+          <span style={{ color: t.textMuted }}>HTTP</span>
+          <span style={{ color: d.httpStatus < 400 ? 'rgba(74,222,128,0.7)' : '#f87171' }}>
+            {d.httpStatus}
+          </span>
+        </div>
       )}
       <div className="pt-1.5 border-t" style={{ borderColor: t.tooltipBorder, color: t.textFaint }}>
         {timeLabel}
@@ -468,11 +468,6 @@ function MonitorCardInner({
           </span>
         </div>
       )}
-
-      {/* ── Uptime blocks strip ── */}
-      <div className="px-2 pt-2 pb-1">
-        <UptimeBlocks history={monitor.history} count={40} blockHeight={8} />
-      </div>
 
       {/* ── Sparkline ── */}
       <div className="px-2 pb-2">
