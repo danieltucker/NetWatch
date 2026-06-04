@@ -8,6 +8,8 @@ const DEFAULT_SETTINGS = {
   telegram_enabled: '', telegram_token: '', telegram_chat_id: '',
   email_enabled: '', email_smtp_host: '', email_smtp_port: '587',
   email_smtp_user: '', email_smtp_pass: '', email_from: '', email_to: '',
+  email_auth_type: '', email_oauth_client_id: '', email_oauth_client_secret: '',
+  email_oauth_token_expiry: '',
   twilio_enabled: '', twilio_account_sid: '', twilio_auth_token: '',
   twilio_from: '', twilio_to: '',
   webhook_enabled: '', webhook_url: '',
@@ -24,13 +26,17 @@ const TABS = [
   { id: 'api-keys',      label: 'API Keys',       Icon: Key            },
 ];
 
-// Required fields per channel — used for pre-save validation
+// Required fields per channel — used for pre-save validation.
+// Email uses getFields() because required fields differ between basic and OAuth2 auth.
 const CHANNEL_VALIDATION = [
   { label: 'Telegram', enabledKey: 'telegram_enabled',
     fields: ['telegram_token', 'telegram_chat_id'] },
   { label: 'Email',    enabledKey: 'email_enabled',
-    fields: ['email_smtp_host', 'email_smtp_port', 'email_smtp_user',
-             'email_smtp_pass', 'email_from', 'email_to'] },
+    getFields: (s) => s.email_auth_type === 'oauth2'
+      ? ['email_smtp_host', 'email_smtp_port', 'email_oauth_client_id',
+         'email_oauth_client_secret', 'email_smtp_user', 'email_from', 'email_to']
+      : ['email_smtp_host', 'email_smtp_port', 'email_smtp_user',
+         'email_smtp_pass', 'email_from', 'email_to'] },
   { label: 'SMS',      enabledKey: 'twilio_enabled',
     fields: ['twilio_account_sid', 'twilio_auth_token', 'twilio_from', 'twilio_to'] },
   { label: 'Webhook',  enabledKey: 'webhook_enabled',
@@ -123,9 +129,10 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
     const missing  = new Set();
     const badNames = [];
 
-    for (const { label, enabledKey, fields } of CHANNEL_VALIDATION) {
+    for (const { label, enabledKey, fields, getFields } of CHANNEL_VALIDATION) {
       if (settings[enabledKey] !== '1') continue;
-      const empty = fields.filter(f => !settings[f]?.trim());
+      const effectiveFields = getFields ? getFields(settings) : fields;
+      const empty = effectiveFields.filter(f => !settings[f]?.trim());
       if (empty.length > 0) {
         empty.forEach(f => missing.add(f));
         badNames.push(label);
@@ -539,17 +546,89 @@ function GeneralTab({ chartYMax, onChartYMaxChange, alertsAutoOpen, onAlertsAuto
 // ── Notifications tab ─────────────────────────────────────────────────────────
 
 const SMTP_PRESETS = [
-  { name: 'Gmail',   host: 'smtp.gmail.com',        port: '587',
+  { name: 'Gmail',   host: 'smtp.gmail.com',        port: '587', authType: 'basic',
     note: 'Gmail requires an App Password. Enable 2-Step Verification, then generate one at myaccount.google.com → Security → App Passwords.' },
-  { name: 'Outlook', host: 'smtp-mail.outlook.com', port: '587',
-    note: 'Use your full Outlook/Hotmail/Live email address and account password. If you have 2FA enabled, generate an App Password instead.' },
-  { name: 'Yahoo',   host: 'smtp.mail.yahoo.com',   port: '587',
+  { name: 'Outlook', host: 'smtp-mail.outlook.com', port: '587', authType: 'oauth2',
+    note: 'Microsoft requires OAuth2. Register an app in the Azure Portal, then enter your Client ID and Secret below and click Connect.' },
+  { name: 'Yahoo',   host: 'smtp.mail.yahoo.com',   port: '587', authType: 'basic',
     note: 'Yahoo requires an App Password. Go to Yahoo Account Security and generate one under "Generate app password".' },
-  { name: 'iCloud',  host: 'smtp.mail.me.com',      port: '587',
+  { name: 'iCloud',  host: 'smtp.mail.me.com',      port: '587', authType: 'basic',
     note: 'iCloud requires an App-Specific Password. Generate one at appleid.apple.com → Sign-In and Security → App-Specific Passwords.' },
 ];
 
 function NotificationsTab({ settings, set, testState, test, inputCls, inputStyle, invalidFields, t, isDark }) {
+  const [oauthConnecting, setOauthConnecting] = useState(false);
+  const [oauthError,      setOauthError]      = useState('');
+
+  const isOAuthConnected = !!(settings.email_smtp_user && settings.email_oauth_token_expiry);
+
+  const startOAuthConnect = async () => {
+    setOauthConnecting(true);
+    setOauthError('');
+    try {
+      // Pre-save client credentials so the callback handler can read them from the DB
+      await fetch('/api/settings', {
+        method:  'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email_auth_type:       settings.email_auth_type,
+          email_oauth_client_id: settings.email_oauth_client_id,
+          ...(settings.email_oauth_client_secret !== '***'
+            ? { email_oauth_client_secret: settings.email_oauth_client_secret }
+            : {}),
+        }),
+      });
+      const res = await fetch('/api/oauth/microsoft/start');
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to start OAuth flow');
+      }
+      const { url } = await res.json();
+      const popup = window.open(url, 'ms-oauth', 'width=600,height=700,scrollbars=yes');
+
+      let closedPoll;
+      const handler = (e) => {
+        if (e.origin !== window.location.origin) return;
+        if (e.data?.type === 'ms-oauth-success') {
+          window.removeEventListener('message', handler);
+          clearInterval(closedPoll);
+          setOauthConnecting(false);
+          fetch('/api/settings').then(r => r.json()).then(data => {
+            if (data.email_smtp_user)          set('email_smtp_user',          data.email_smtp_user);
+            if (data.email_oauth_token_expiry) set('email_oauth_token_expiry', data.email_oauth_token_expiry);
+          });
+        } else if (e.data?.type === 'ms-oauth-error') {
+          window.removeEventListener('message', handler);
+          clearInterval(closedPoll);
+          setOauthConnecting(false);
+          setOauthError(e.data.error || 'Authentication failed');
+        }
+      };
+      window.addEventListener('message', handler);
+      closedPoll = setInterval(() => {
+        if (popup?.closed) {
+          clearInterval(closedPoll);
+          window.removeEventListener('message', handler);
+          setOauthConnecting(false);
+        }
+      }, 500);
+    } catch (err) {
+      setOauthConnecting(false);
+      setOauthError(err.message);
+    }
+  };
+
+  const disconnectOAuth = async () => {
+    await fetch('/api/oauth/microsoft/disconnect', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    '{}',
+    });
+    set('email_smtp_user',          '');
+    set('email_oauth_token_expiry', '');
+    set('email_auth_type',          'basic');
+  };
+
   // Returns input style with red border when the field has a validation error
   const fs = (key) => invalidFields.has(key)
     ? { ...inputStyle, borderColor: '#ef4444', boxShadow: '0 0 0 2px rgba(239,68,68,0.15)' }
@@ -587,9 +666,10 @@ function NotificationsTab({ settings, set, testState, test, inputCls, inputStyle
 
       <Channel
         title="Email"
-        description="SMTP delivery — works with Gmail App Passwords, Resend, or any SMTP relay"
+        description="SMTP delivery — works with Gmail App Passwords, Outlook OAuth2, or any SMTP relay"
         enabled={settings.email_enabled === '1'}
-        hasError={channelHasError('email_smtp_host', 'email_smtp_port', 'email_smtp_user', 'email_smtp_pass', 'email_from', 'email_to')}
+        hasError={channelHasError('email_smtp_host', 'email_smtp_port', 'email_smtp_user', 'email_smtp_pass',
+                                  'email_oauth_client_id', 'email_oauth_client_secret', 'email_from', 'email_to')}
         onToggle={v => set('email_enabled', v ? '1' : '')}
         testState={testState.email}
         onTest={() => test('email')}
@@ -598,85 +678,168 @@ function NotificationsTab({ settings, set, testState, test, inputCls, inputStyle
 
         {/* ── Provider presets ── */}
         {(() => {
-          const active = SMTP_PRESETS.find(p => p.host === settings.email_smtp_host) ?? null;
+          const active   = SMTP_PRESETS.find(p => p.host === settings.email_smtp_host) ?? null;
+          const isOAuth2 = settings.email_auth_type === 'oauth2';
           return (
-            <div className="space-y-2 pb-1">
-              <div className="text-xs font-mono uppercase tracking-wider" style={{ color: t.textMuted }}>
-                Quick setup
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {SMTP_PRESETS.map(p => {
-                  const isActive = p.host === settings.email_smtp_host;
-                  return (
-                    <button
-                      key={p.name}
-                      type="button"
-                      onClick={() => { set('email_smtp_host', p.host); set('email_smtp_port', p.port); }}
-                      className="px-3 py-1.5 rounded-lg border text-xs font-mono font-medium transition-all"
-                      style={{
-                        backgroundColor: isActive
-                          ? isDark ? 'rgba(96,165,250,0.15)' : 'rgba(59,130,246,0.1)'
-                          : isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                        borderColor:  isActive ? '#60a5fa' : t.cardBorder,
-                        color:        isActive ? '#60a5fa' : t.textSecondary,
-                      }}>
-                      {p.name}
-                    </button>
-                  );
-                })}
-              </div>
-              {active?.note && (
-                <div className="flex items-start gap-1.5 text-xs font-mono leading-relaxed"
-                  style={{ color: t.textMuted }}>
-                  <AlertCircle size={11} className="mt-0.5 shrink-0" style={{ color: '#f59e0b' }} />
-                  {active.note}
+            <>
+              <div className="space-y-2 pb-1">
+                <div className="text-xs font-mono uppercase tracking-wider" style={{ color: t.textMuted }}>
+                  Quick setup
                 </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {SMTP_PRESETS.map(p => {
+                    const isActive = p.host === settings.email_smtp_host;
+                    return (
+                      <button
+                        key={p.name}
+                        type="button"
+                        onClick={() => {
+                          set('email_smtp_host', p.host);
+                          set('email_smtp_port', p.port);
+                          set('email_auth_type', p.authType || 'basic');
+                        }}
+                        className="px-3 py-1.5 rounded-lg border text-xs font-mono font-medium transition-all"
+                        style={{
+                          backgroundColor: isActive
+                            ? isDark ? 'rgba(96,165,250,0.15)' : 'rgba(59,130,246,0.1)'
+                            : isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+                          borderColor: isActive ? '#60a5fa' : t.cardBorder,
+                          color:       isActive ? '#60a5fa' : t.textSecondary,
+                        }}>
+                        {p.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                {active?.note && (
+                  <div className="flex items-start gap-1.5 text-xs font-mono leading-relaxed"
+                    style={{ color: t.textMuted }}>
+                    <AlertCircle size={11} className="mt-0.5 shrink-0" style={{ color: '#f59e0b' }} />
+                    {active.note}
+                    {active.authType === 'oauth2' && (
+                      <a href="https://portal.azure.com" target="_blank" rel="noopener noreferrer"
+                        className="ml-1 underline" style={{ color: '#60a5fa' }}>
+                        Azure Portal
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="SMTP Host" invalid={invalidFields.has('email_smtp_host')} t={t}>
+                  <input value={settings.email_smtp_host}
+                    onChange={e => set('email_smtp_host', e.target.value)}
+                    placeholder="smtp.gmail.com"
+                    className={inputCls} style={fs('email_smtp_host')} />
+                </Field>
+                <Field label="Port" invalid={invalidFields.has('email_smtp_port')} t={t}>
+                  <input value={settings.email_smtp_port}
+                    onChange={e => set('email_smtp_port', e.target.value)}
+                    placeholder="587"
+                    className={inputCls} style={fs('email_smtp_port')} />
+                </Field>
+              </div>
+
+              {isOAuth2 ? (
+                <>
+                  <Field label="Client ID" invalid={invalidFields.has('email_oauth_client_id')} t={t}>
+                    <input value={settings.email_oauth_client_id}
+                      onChange={e => set('email_oauth_client_id', e.target.value)}
+                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                      className={inputCls} style={fs('email_oauth_client_id')} />
+                  </Field>
+                  <Field label="Client Secret" invalid={invalidFields.has('email_oauth_client_secret')} t={t}>
+                    <input type="password"
+                      value={settings.email_oauth_client_secret}
+                      onChange={e => set('email_oauth_client_secret', e.target.value)}
+                      placeholder="••••••••••••••••"
+                      className={inputCls} style={fs('email_oauth_client_secret')} />
+                  </Field>
+                  <div>
+                    {isOAuthConnected ? (
+                      <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg"
+                        style={{
+                          background:  isDark ? 'rgba(34,197,94,0.08)' : 'rgba(34,197,94,0.06)',
+                          border:      '1px solid rgba(34,197,94,0.2)',
+                        }}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <CheckCircle size={13} style={{ color: '#22c55e', flexShrink: 0 }} />
+                          <span className="text-xs font-mono truncate" style={{ color: t.textSecondary }}>
+                            {settings.email_smtp_user}
+                          </span>
+                        </div>
+                        <button type="button" onClick={disconnectOAuth}
+                          className="text-xs font-mono px-2 py-0.5 rounded flex-shrink-0"
+                          style={{ color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                          Disconnect
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <button type="button" onClick={startOAuthConnect}
+                          disabled={oauthConnecting || !settings.email_oauth_client_id?.trim()}
+                          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-mono font-medium transition-all"
+                          style={{
+                            background: isDark ? 'rgba(96,165,250,0.12)' : 'rgba(59,130,246,0.1)',
+                            border:     '1px solid rgba(96,165,250,0.3)',
+                            color:      '#60a5fa',
+                            opacity:    (!settings.email_oauth_client_id?.trim() || oauthConnecting) ? 0.5 : 1,
+                            cursor:     (!settings.email_oauth_client_id?.trim() || oauthConnecting) ? 'not-allowed' : 'pointer',
+                          }}>
+                          {oauthConnecting
+                            ? <><Loader size={12} className="animate-spin" />&nbsp;Connecting…</>
+                            : 'Connect Microsoft Account'}
+                        </button>
+                        {invalidFields.has('email_smtp_user') && (
+                          <div className="text-xs font-mono" style={{ color: '#ef4444' }}>
+                            Microsoft account not connected — click Connect above
+                          </div>
+                        )}
+                        {oauthError && (
+                          <div className="text-xs font-mono leading-relaxed" style={{ color: '#ef4444' }}>
+                            {oauthError}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Field label="Username" invalid={invalidFields.has('email_smtp_user')} t={t}>
+                    <input value={settings.email_smtp_user}
+                      onChange={e => set('email_smtp_user', e.target.value)}
+                      placeholder="you@gmail.com"
+                      className={inputCls} style={fs('email_smtp_user')} />
+                  </Field>
+                  <Field label="Password / App Password" invalid={invalidFields.has('email_smtp_pass')} t={t}>
+                    <input type="password"
+                      value={settings.email_smtp_pass}
+                      onChange={e => set('email_smtp_pass', e.target.value)}
+                      placeholder="••••••••••••••••"
+                      className={inputCls} style={fs('email_smtp_pass')} />
+                  </Field>
+                </>
               )}
-            </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="From" invalid={invalidFields.has('email_from')} t={t}>
+                  <input value={settings.email_from}
+                    onChange={e => set('email_from', e.target.value)}
+                    placeholder="alerts@example.com"
+                    className={inputCls} style={fs('email_from')} />
+                </Field>
+                <Field label="To" invalid={invalidFields.has('email_to')} t={t}>
+                  <input value={settings.email_to}
+                    onChange={e => set('email_to', e.target.value)}
+                    placeholder="you@example.com"
+                    className={inputCls} style={fs('email_to')} />
+                </Field>
+              </div>
+            </>
           );
         })()}
-
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="SMTP Host" invalid={invalidFields.has('email_smtp_host')} t={t}>
-            <input value={settings.email_smtp_host}
-              onChange={e => set('email_smtp_host', e.target.value)}
-              placeholder="smtp.gmail.com"
-              className={inputCls} style={fs('email_smtp_host')} />
-          </Field>
-          <Field label="Port" invalid={invalidFields.has('email_smtp_port')} t={t}>
-            <input value={settings.email_smtp_port}
-              onChange={e => set('email_smtp_port', e.target.value)}
-              placeholder="587"
-              className={inputCls} style={fs('email_smtp_port')} />
-          </Field>
-        </div>
-        <Field label="Username" invalid={invalidFields.has('email_smtp_user')} t={t}>
-          <input value={settings.email_smtp_user}
-            onChange={e => set('email_smtp_user', e.target.value)}
-            placeholder="you@gmail.com"
-            className={inputCls} style={fs('email_smtp_user')} />
-        </Field>
-        <Field label="Password / App Password" invalid={invalidFields.has('email_smtp_pass')} t={t}>
-          <input type="password"
-            value={settings.email_smtp_pass}
-            onChange={e => set('email_smtp_pass', e.target.value)}
-            placeholder="••••••••••••••••"
-            className={inputCls} style={fs('email_smtp_pass')} />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="From" invalid={invalidFields.has('email_from')} t={t}>
-            <input value={settings.email_from}
-              onChange={e => set('email_from', e.target.value)}
-              placeholder="alerts@example.com"
-              className={inputCls} style={fs('email_from')} />
-          </Field>
-          <Field label="To" invalid={invalidFields.has('email_to')} t={t}>
-            <input value={settings.email_to}
-              onChange={e => set('email_to', e.target.value)}
-              placeholder="you@example.com"
-              className={inputCls} style={fs('email_to')} />
-          </Field>
-        </div>
       </Channel>
 
       <Channel

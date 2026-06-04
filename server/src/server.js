@@ -9,6 +9,7 @@ import alertsRouter           from './routes/alerts.js';
 import moduleInstancesRouter  from './routes/module-instances.js';
 import toolsRouter            from './routes/tools.js';
 import keysRouter             from './routes/keys.js';
+import oauthRouter            from './routes/oauth.js';
 import v1Router               from './routes/v1.js';
 import { loadModules, registry } from './modules/registry.js';
 import { initReportScheduler }  from './report-scheduler.js';
@@ -60,6 +61,7 @@ app.use('/api/alerts',           alertsRouter);
 app.use('/api/module-instances', moduleInstancesRouter);
 app.use('/api/tools',            toolsRouter);
 app.use('/api/keys',             keysRouter);
+app.use('/api/oauth',            oauthRouter);
 app.use('/api/v1',               v1Router);
 
 // Fallback: let the React router handle all non-API paths

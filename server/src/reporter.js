@@ -9,9 +9,9 @@
  *  - border-radius is kept for modern clients; Outlook renders square corners
  */
 
-import nodemailer from 'nodemailer';
-import { db, rowToMonitor } from './db/index.js';
-import { getSetting } from './db/index.js';
+import { db, rowToMonitor }    from './db/index.js';
+import { getSetting }           from './db/index.js';
+import { buildEmailTransport }  from './alerter.js';
 
 // ── Data aggregation ──────────────────────────────────────────────────────────
 
@@ -260,9 +260,7 @@ function buildReportHtml({ periodLabel, fromDate, toDate, monitors, tagFilter })
 
 export async function sendReport(periodLabel, startIso, endIso) {
   const host = getSetting('email_smtp_host');
-  const port = getSetting('email_smtp_port', '587');
   const user = getSetting('email_smtp_user');
-  const pass = getSetting('email_smtp_pass');
   const from = getSetting('email_from');
   const to   = getSetting('email_to');
 
@@ -315,12 +313,7 @@ export async function sendReport(periodLabel, startIso, endIso) {
       `, ${m.stats.incidents} incident(s)`)
   ].join('\n');
 
-  const transporter = nodemailer.createTransport({
-    host,
-    port:   Number(port),
-    secure: Number(port) === 465,
-    auth:   user ? { user, pass } : undefined,
-  });
+  const transporter = await buildEmailTransport();
 
   await transporter.sendMail({ from: from || user, to, subject, text: plain, html });
 

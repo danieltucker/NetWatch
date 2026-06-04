@@ -13,7 +13,7 @@
 
 import got        from 'got';
 import nodemailer from 'nodemailer';
-import { getSetting } from './db/index.js';
+import { getSetting, setSetting } from './db/index.js';
 import { assertNotSsrfTarget } from './checkers/ssrf-guard.js';
 
 // ── Message formatting ────────────────────────────────────────────────────────
@@ -87,25 +87,81 @@ export async function sendTelegramAlert(monitor, event, overrides = {}) {
   });
 }
 
+// ── Email transport builder (shared with reporter.js) ─────────────────────────
+
+const MS_TOKEN_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
+
+export async function buildEmailTransport(overrides = {}) {
+  const authType = overrides.email_auth_type ?? getSetting('email_auth_type', 'basic');
+  const host     = overrides.email_smtp_host ?? getSetting('email_smtp_host');
+  const port     = overrides.email_smtp_port ?? getSetting('email_smtp_port', '587');
+  const user     = overrides.email_smtp_user ?? getSetting('email_smtp_user');
+
+  if (authType === 'oauth2') {
+    const clientId     = getSetting('email_oauth_client_id');
+    const clientSecret = getSetting('email_oauth_client_secret');
+    let   accessToken  = getSetting('email_oauth_access_token');
+    const refreshToken = getSetting('email_oauth_refresh_token');
+    const expiryStr    = getSetting('email_oauth_token_expiry');
+
+    // Proactively refresh when token expires within 5 minutes
+    if (refreshToken && expiryStr && Date.now() + 5 * 60 * 1000 >= new Date(expiryStr).getTime()) {
+      try {
+        const res = await got.post(MS_TOKEN_URL, {
+          form: {
+            client_id:     clientId,
+            client_secret: clientSecret,
+            grant_type:    'refresh_token',
+            refresh_token: refreshToken,
+            scope:         'https://outlook.office.com/SMTP.Send offline_access',
+          },
+        }).json();
+        accessToken = res.access_token;
+        setSetting('email_oauth_access_token', accessToken);
+        setSetting('email_oauth_token_expiry', new Date(Date.now() + Number(res.expires_in) * 1000).toISOString());
+        if (res.refresh_token) setSetting('email_oauth_refresh_token', res.refresh_token);
+      } catch (err) {
+        throw new Error('OAuth2 token refresh failed — please reconnect your Microsoft account in Settings');
+      }
+    }
+
+    return nodemailer.createTransport({
+      host,
+      port:   Number(port),
+      secure: Number(port) === 465,
+      auth: {
+        type:         'OAuth2',
+        user,
+        clientId,
+        clientSecret,
+        refreshToken,
+        accessToken,
+      },
+    });
+  }
+
+  // Basic auth (default)
+  const pass = overrides.email_smtp_pass ?? getSetting('email_smtp_pass');
+  return nodemailer.createTransport({
+    host,
+    port:   Number(port),
+    secure: Number(port) === 465,
+    auth:   user ? { user, pass } : undefined,
+  });
+}
+
 // ── Email ─────────────────────────────────────────────────────────────────────
 
 export async function sendEmailAlert(monitor, event, overrides = {}) {
   const host = overrides.email_smtp_host ?? getSetting('email_smtp_host');
-  const port = overrides.email_smtp_port ?? getSetting('email_smtp_port', '587');
   const user = overrides.email_smtp_user ?? getSetting('email_smtp_user');
-  const pass = overrides.email_smtp_pass ?? getSetting('email_smtp_pass');
   const from = overrides.email_from      ?? getSetting('email_from');
   const to   = overrides.email_to        ?? getSetting('email_to');
 
   if (!host) throw new Error('SMTP host is not configured');
   if (!to)   throw new Error('Recipient email address is not configured');
 
-  const transporter = nodemailer.createTransport({
-    host,
-    port:   Number(port),
-    secure: Number(port) === 465,
-    auth:   user ? { user, pass } : undefined,
-  });
+  const transporter = await buildEmailTransport(overrides);
 
   await transporter.sendMail({
     from:    from || user,

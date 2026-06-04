@@ -10,6 +10,12 @@ const KNOWN_KEYS = [
   'telegram_enabled', 'telegram_token', 'telegram_chat_id',
   'email_enabled', 'email_smtp_host', 'email_smtp_port',
   'email_smtp_user', 'email_smtp_pass', 'email_from', 'email_to',
+  'email_auth_type',
+  'email_oauth_client_id',
+  'email_oauth_client_secret',
+  'email_oauth_access_token',
+  'email_oauth_refresh_token',
+  'email_oauth_token_expiry',
   'twilio_enabled', 'twilio_account_sid', 'twilio_auth_token',
   'twilio_from', 'twilio_to',
   'webhook_enabled', 'webhook_url',
@@ -21,6 +27,7 @@ const KNOWN_KEYS = [
 const SECRET_KEYS = new Set([
   'telegram_token', 'email_smtp_pass', 'twilio_auth_token',
   'twilio_account_sid', 'webhook_url',
+  'email_oauth_client_secret', 'email_oauth_access_token', 'email_oauth_refresh_token',
 ]);
 
 function isModuleSecret(key) {
@@ -47,8 +54,13 @@ router.get('/', (_req, res) => {
 
 // ── PUT /api/settings ─────────────────────────────────────────────────────────
 
-// report_last_sent is written by the report-scheduler only — never from the UI
-const READ_ONLY_KEYS = new Set(['report_last_sent']);
+// These keys are written only by server-side processes, never from the UI PUT endpoint
+const READ_ONLY_KEYS = new Set([
+  'report_last_sent',
+  'email_oauth_access_token',
+  'email_oauth_refresh_token',
+  'email_oauth_token_expiry',
+]);
 
 router.put('/', (req, res) => {
   for (const key of KNOWN_KEYS) {
