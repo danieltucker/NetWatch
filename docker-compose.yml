@@ -1,9 +1,9 @@
 services:
-  watchtower:
+  netwatch:
     build:
       context: .          # Dockerfile lives at repo root
       dockerfile: Dockerfile
-    container_name: watchtower
+    container_name: netwatch
     restart: unless-stopped
     ports:
       - "${PORT:-3000}:3000"
@@ -12,12 +12,12 @@ services:
       NODE_ENV: production
     volumes:
       # SQLite DB and any future file assets persist across container restarts
-      - watchtower-data:/app/data
+      - netwatch-data:/app/data
     cap_add:
       # NET_RAW is already in Docker's default capability set, but declaring it
       # explicitly documents the requirement for ICMP ping (net-ping package).
       - NET_RAW
 
 volumes:
-  watchtower-data:
+  netwatch-data:
     driver: local
