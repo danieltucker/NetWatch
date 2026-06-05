@@ -30,7 +30,7 @@ import { moduleRegistry }      from './modules/index.js';
 
 // ── Sortable card wrapper ─────────────────────────────────────────────────────
 
-function SortableMonitorCard({ monitor, onEdit, onCardClick, onZoomToPoint, width, sortEnabled, chartYMax }) {
+function SortableMonitorCard({ monitor, onEdit, onCardClick, onIncidentClick, width, sortEnabled, chartYMax }) {
   const id = String(monitor.id);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
@@ -48,7 +48,7 @@ function SortableMonitorCard({ monitor, onEdit, onCardClick, onZoomToPoint, widt
         monitor={monitor}
         onEdit={onEdit}
         onCardClick={onCardClick}
-        onZoomToPoint={onZoomToPoint}
+        onIncidentClick={onIncidentClick}
         dragHandleProps={sortEnabled ? { ...attributes, ...listeners } : undefined}
         isDragging={isDragging}
         chartYMax={chartYMax}
@@ -139,8 +139,9 @@ export default function App() {
   const [submitting,     setSubmitting]     = useState(false);
   const [formError,      setFormError]      = useState('');
   const [pageError,      setPageError]      = useState('');
-  const [detailMonitor,  setDetailMonitor]  = useState(null);
-  const [detailTab,      setDetailTab]      = useState('history');
+  const [detailMonitor,    setDetailMonitor]    = useState(null);
+  const [detailTab,        setDetailTab]        = useState('history');
+  const [incidentTimestamp, setIncidentTimestamp] = useState(null);
   const [addingFor,      setAddingFor]      = useState(null); // moduleId for new instance form
   const [instanceSubmitting, setInstanceSubmitting] = useState(false);
   const [instanceError,  setInstanceError]  = useState('');
@@ -173,13 +174,11 @@ export default function App() {
     }
   }, [historyRange]);
 
-  // ── Zoom to incident — sets global range ±30 min around a down-event ──────
-  const handleZoomToIncident = useCallback((timestamp) => {
-    const ms   = new Date(timestamp).getTime();
-    const from = new Date(ms - 30 * 60 * 1000).toISOString();
-    const to   = new Date(ms + 30 * 60 * 1000).toISOString();
-    setHistoryRange({ type: 'zoom', from, to, incidentAt: timestamp });
-  }, []);
+  // ── Incident dot click — open modal on Incidents tab at that timestamp ──────
+  const handleIncidentClick = useCallback((mon, timestamp) => {
+    setIncidentTimestamp(timestamp);
+    openDetail(mon, 'incidents');
+  }, [openDetail]);
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const userMonitors = monitors.filter(m => !m.tags?.includes('_ref'));
@@ -334,7 +333,7 @@ export default function App() {
             </span>
             <span className="hidden sm:inline text-xs font-mono px-2 py-0.5 rounded border"
               style={{ color: t.textFaint, borderColor: t.cardBorder }}>
-              netwatch · v6.4.2
+              netwatch · v6.4.3
             </span>
           </div>
 
@@ -556,7 +555,7 @@ export default function App() {
                         monitor={m}
                         onEdit={mon => openDetail(mon, 'configure')}
                         onCardClick={mon => openDetail(mon, 'history')}
-                        onZoomToPoint={handleZoomToIncident}
+                        onIncidentClick={handleIncidentClick}
                         width={getWidth(m.id)}
                         sortEnabled={sortEnabled}
                         chartYMax={chartYMax}
@@ -679,7 +678,8 @@ export default function App() {
         <MonitorDetailModal
           monitor={monitors.find(m => m.id === detailMonitor.id) ?? detailMonitor}
           initialTab={detailTab}
-          onClose={() => setDetailMonitor(null)}
+          initialIncidentTimestamp={incidentTimestamp}
+          onClose={() => { setDetailMonitor(null); setIncidentTimestamp(null); }}
           onSave={updateMonitor}
           onDelete={deleteMonitor}
           width={getWidth(detailMonitor.id)}

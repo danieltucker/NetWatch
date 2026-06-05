@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useState } from 'react';
+import React, { useRef, useMemo, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { AreaChart, Area, YAxis, ReferenceLine, ResponsiveContainer, Tooltip } from 'recharts';
 import { Edit2, Tag, ShieldCheck, ShieldAlert, ExternalLink } from 'lucide-react';
@@ -112,6 +112,17 @@ function SparkTooltipContent({ d, t }) {
               </span>
             </div>
           )}
+          {/* Explain absence of timing detail so users know why it's missing */}
+          {!hasBreakdown && !isAggregated && total > 0 && (
+            <div className="mb-1.5 text-[10px]" style={{ color: t.textFaint }}>
+              timing breakdown unavailable for this check type
+            </div>
+          )}
+          {!hasBreakdown && isAggregated && (
+            <div className="mb-1.5 text-[10px]" style={{ color: t.textFaint }}>
+              switch to 1h or 6h for per-request timing
+            </div>
+          )}
         </>
       )}
       {/* HTTP status shown for both up and down states — failed status codes are useful when down */}
@@ -161,8 +172,8 @@ const SparkDot = ({ cx, cy, payload, index, onZoom }) => {
     return (
       <g key={`d-${index}`}>
         {onZoom && (
-          <circle cx={cx} cy={cy} r={10} fill="transparent" style={{ cursor: 'crosshair' }}
-            title="Zoom to this incident"
+          <circle cx={cx} cy={cy} r={10} fill="transparent" style={{ cursor: 'pointer' }}
+            title="View incident"
             onClick={e => { e.stopPropagation(); onZoom(payload.timestamp); }} />
         )}
         <circle cx={cx} cy={cy} r={3} fill="#ef4444" style={{ pointerEvents: 'none' }} />
@@ -295,14 +306,18 @@ function UptimeMetric({ uptimePercent, hasHistory, trend, hovered, isDark, t }) 
 function MonitorCardInner({
   monitor, onEdit, onCardClick, compact = false,
   dragHandleProps, isDragging = false,
-  chartYMax = 'auto', onZoomToPoint,
+  chartYMax = 'auto', onIncidentClick,
 }) {
   const { t, isDark } = useTheme();
   const chartRef = useRef(null);
   const [hovered, setHovered] = useState(false);
 
   const tooltipContent = useMemo(() => (props) => <SparkTooltip {...props} containerRef={chartRef} />, []);
-  const dotRenderer    = useMemo(() => (props) => <SparkDot {...props} onZoom={onZoomToPoint} />, [onZoomToPoint]);
+  // Wrap the incident click to include the monitor so App.jsx can open the right modal
+  const handleDotClick = useCallback((timestamp) => {
+    onIncidentClick?.(monitor, timestamp);
+  }, [onIncidentClick, monitor]);
+  const dotRenderer = useMemo(() => (props) => <SparkDot {...props} onZoom={handleDotClick} />, [handleDotClick]);
   const trend = useMemo(() => computeTrend(monitor.history), [monitor.history]);
 
   const chartData = monitor.history.map((h, i) => ({
@@ -531,9 +546,9 @@ function MonitorCardInner({
 }
 
 export const MonitorCard = React.memo(MonitorCardInner, (prev, next) =>
-  prev.monitor       === next.monitor       &&
-  prev.chartYMax     === next.chartYMax     &&
-  prev.isDragging    === next.isDragging    &&
-  prev.compact       === next.compact       &&
-  prev.onZoomToPoint === next.onZoomToPoint
+  prev.monitor        === next.monitor        &&
+  prev.chartYMax      === next.chartYMax      &&
+  prev.isDragging     === next.isDragging     &&
+  prev.compact        === next.compact        &&
+  prev.onIncidentClick === next.onIncidentClick
 );

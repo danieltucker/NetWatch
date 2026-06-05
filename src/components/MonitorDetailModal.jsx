@@ -212,9 +212,21 @@ function HistoryTab({ history, t, isDark }) {
 // Incidents tab
 // ---------------------------------------------------------------------------
 
-function IncidentsTab({ history, t, isDark }) {
+function IncidentsTab({ history, t, isDark, initialIncidentTimestamp }) {
   const incidents = useMemo(() => computeIncidents(history), [history]);
   const [expandedIdx, setExpandedIdx] = useState(null);
+
+  // Auto-expand the incident closest to the clicked sparkline dot
+  useEffect(() => {
+    if (!initialIncidentTimestamp || !incidents.length) return;
+    const ts = new Date(initialIncidentTimestamp).getTime();
+    let closest = 0, minDiff = Infinity;
+    incidents.forEach((inc, i) => {
+      const diff = Math.abs(new Date(inc.start).getTime() - ts);
+      if (diff < minDiff) { minDiff = diff; closest = i; }
+    });
+    setExpandedIdx(closest);
+  }, [initialIncidentTimestamp, incidents]);
 
   if (history.length === 0) {
     return <div className="flex items-center justify-center py-16 text-xs font-mono" style={{ color: t.textFaint }}>No history yet — awaiting first check</div>;
@@ -339,7 +351,7 @@ function SidebarStat({ label, value, valueColor, t }) {
 // ---------------------------------------------------------------------------
 
 export function MonitorDetailModal({
-  monitor, initialTab = 'history', onClose,
+  monitor, initialTab = 'history', initialIncidentTimestamp = null, onClose,
   onSave, onDelete, width, onSetWidth, allTags = [],
 }) {
   const { t, isDark } = useTheme();
@@ -598,7 +610,7 @@ export function MonitorDetailModal({
           {/* Tab content — flows naturally, main column scrolls */}
           <div className="flex-1">
             {activeTab === 'history'   && <HistoryTab   history={history} t={t} isDark={isDark} />}
-            {activeTab === 'incidents' && <IncidentsTab history={history} t={t} isDark={isDark} />}
+            {activeTab === 'incidents' && <IncidentsTab history={history} t={t} isDark={isDark} initialIncidentTimestamp={initialIncidentTimestamp} />}
             {activeTab === 'embed'     && <EmbedTab monitor={monitor} t={t} />}
             {activeTab === 'configure' && (
               <div className="flex flex-col">

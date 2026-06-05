@@ -62,11 +62,12 @@ export function useMonitors(historyWindow = '1h', historyRange = null) {
           ...(m.historyWindow === '1h' ? { uptimePercent: u.uptimePercent } : {}),
         };
 
-        // Only append the raw point to history for the 1h (raw) window.
-        // Longer windows use pre-aggregated buckets — appending a single
-        // raw point would break the bucket shape.
-        if (m.historyWindow === '1h') {
-          const history = [...m.history, u.newPoint].slice(-120);
+        // Append the raw point for all raw-data windows (15m, 1h, 6h).
+        // Aggregated windows (12h+) use pre-bucketed data — a single raw
+        // point would break the bucket shape, so leave those static.
+        const RAW_MAX = { '15m': 15, '1h': 120, '6h': 360 };
+        if (m.historyWindow in RAW_MAX) {
+          const history = [...m.history, u.newPoint].slice(-RAW_MAX[m.historyWindow]);
           return { ...base, history };
         }
 
