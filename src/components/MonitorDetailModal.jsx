@@ -4,7 +4,7 @@ import { X, Trash2, Copy, Check, Monitor, LayoutGrid, ArrowLeftRight, ExternalLi
 import { MonitorForm }       from './MonitorForm';
 import { TimingChip }        from './TimingRow';
 import { UptimeBlocks }      from './UptimeBlocks';
-import { StatusPill, StatusDot } from './MonitorCard';
+import { StatusPill, StatusDot } from './StatusIndicators';
 import { useTheme }          from '../hooks/useTheme';
 import { formatTimestamp, formatInterval } from '../types/monitor';
 
