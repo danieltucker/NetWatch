@@ -333,20 +333,6 @@ function EmbedTab({ monitor, t }) {
 }
 
 // ---------------------------------------------------------------------------
-// Sidebar stat row
-// ---------------------------------------------------------------------------
-
-function SidebarStat({ label, value, valueColor, t }) {
-  return (
-    <div className="flex items-center justify-between py-2 border-b text-xs font-mono"
-      style={{ borderColor: t.metricGap }}>
-      <span style={{ color: t.textFaint }}>{label}</span>
-      <span style={{ color: valueColor ?? t.textSecondary }}>{value}</span>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // MonitorDetailModal — fullscreen
 // ---------------------------------------------------------------------------
 
@@ -363,6 +349,7 @@ export function MonitorDetailModal({
   const [historyWindow, setHistoryWindow] = useState('1h');
   const [localHistory,  setLocalHistory]  = useState(null);
   const [windowLoading, setWindowLoading] = useState(false);
+  const [periodStats,   setPeriodStats]   = useState(null);
   const chartRef = useRef(null);
 
   // Hash-based routing — enables browser back button and shareable URLs
@@ -379,6 +366,18 @@ export function MonitorDetailModal({
     }
     onClose();
   };
+
+  // Fetch fixed-period stats (1d, 7d, 30d) once on open for the period comparison row
+  useEffect(() => {
+    Promise.all(['1d', '1w', '30d'].map(w =>
+      fetch(`/api/monitors/${monitor.id}?window=${w}`)
+        .then(r => r.json())
+        .then(data => ({ window: w, history: data.history ?? [] }))
+        .catch(() => ({ window: w, history: [] }))
+    )).then(results => {
+      setPeriodStats(Object.fromEntries(results.map(r => [r.window, computeStats(r.history, r.window)])));
+    });
+  }, [monitor.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const history = localHistory ?? monitor.history ?? [];
 
@@ -401,7 +400,9 @@ export function MonitorDetailModal({
   const displayStatus = monitor.status === 'up' && monitor.degradedThreshold != null &&
     monitor.currentPing != null && monitor.currentPing > monitor.degradedThreshold ? 'degraded' : monitor.status;
 
-  const lineColor  = displayStatus === 'down' ? '#ef4444' : displayStatus === 'degraded' ? '#f59e0b' : '#22c55e';
+  const lineColor   = displayStatus === 'down' ? '#ef4444' : displayStatus === 'degraded' ? '#f59e0b' : '#22c55e';
+  const statusColor = displayStatus === 'down' ? '#ef4444' : displayStatus === 'degraded' ? '#f59e0b' : displayStatus === 'up' ? '#22c55e' : '#6b7280';
+  const statusBg    = displayStatus === 'down' ? 'rgba(239,68,68,0.2)' : displayStatus === 'degraded' ? 'rgba(245,158,11,0.2)' : displayStatus === 'up' ? 'rgba(34,197,94,0.2)' : 'rgba(107,114,128,0.2)';
   const gradientId = `modal-${monitor.id}`;
   const isHttpLike = monitor.checkType === 'http' || monitor.checkType === 'api';
   const targetHref = monitor.target?.startsWith('http') ? monitor.target : `https://${monitor.target}`;
@@ -479,260 +480,274 @@ export function MonitorDetailModal({
         </div>
       </div>
 
-      {/* ── Body ── */}
-      <div className="flex-1 min-h-0 flex overflow-hidden">
+      {/* ── Single scrollable body ── */}
+      <div className="flex-1 overflow-y-auto">
 
-        {/* ── Main column ── */}
-        <div className="flex-1 min-w-0 overflow-y-auto flex flex-col">
-
-          {/* Mobile stats strip (hidden on md+) */}
-          <div className="md:hidden grid grid-cols-4 divide-x border-b shrink-0"
-            style={{ borderColor: t.metricGap }}>
-            {[
-              { label: 'Uptime',    value: uptimePctDisplay, color: uptimeColor },
-              { label: 'Avg',       value: avgDisplay,       color: t.textSecondary },
-              { label: historyWindow === '1h' ? 'P95' : 'Best', value: p95Display, color: t.textSecondary },
-              { label: 'Incidents', value: stats.incidents,  color: stats.incidents > 0 ? '#f87171' : t.textFaint },
-            ].map(({ label, value, color }) => (
-              <div key={label} className="px-4 py-3" style={{ borderColor: t.metricGap }}>
-                <div className="text-[10px] font-mono uppercase tracking-wider mb-1" style={{ color: t.textFaint }}>{label}</div>
-                <span className="text-sm font-mono font-bold" style={{ color }}>{value}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Chart area */}
-          <div className="px-6 py-5 space-y-4">
-
-            {/* UptimeBlocks with label */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: t.textFaint }}>
-                  Status history
+        {/* ── Page header ── */}
+        <div className="px-8 py-5 border-b" style={{ borderColor: t.metricGap }}>
+          <div className="flex items-center gap-3">
+            {/* Large status circle */}
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${displayStatus === 'down' ? 'animate-pulse' : ''}`}
+              style={{ backgroundColor: statusBg }}>
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: statusColor }} />
+            </div>
+            {/* Name + link */}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-mono font-bold truncate" style={{ color: t.textPrimary }}>
+                  {monitor.label}
                 </span>
-                {stats.uptimePct != null && (
-                  <span className="text-[10px] font-mono" style={{ color: uptimeColor }}>
-                    {stats.uptimePct}% up
-                  </span>
+                {isHttpLike && (
+                  <button
+                    onClick={() => window.open(targetHref, '_blank', 'noopener,noreferrer')}
+                    className="shrink-0 opacity-40 hover:opacity-80 transition-opacity"
+                    title={monitor.target}>
+                    <ExternalLink size={14} style={{ color: t.textSecondary }} />
+                  </button>
                 )}
               </div>
-              <UptimeBlocks history={history} count={60} blockHeight={12} />
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs font-mono truncate" style={{ color: t.textMuted }}>
+                  {monitor.target}{monitor.port ? `:${monitor.port}` : ''}
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border shrink-0"
+                  style={{ color: t.textFaint, borderColor: t.cardBorder }}>
+                  {CHECK_TYPE_LABELS[monitor.checkType] ?? (monitor.checkType ?? 'HTTP').toUpperCase()}
+                </span>
+              </div>
             </div>
+          </div>
+        </div>
 
-            {/* Response time chart */}
-            <div className="relative">
-              {trend.ping && (
-                <div className="absolute top-0 right-0 text-[10px] font-mono opacity-75 z-10"
-                  style={{ color: trend.ping.direction === 'faster' ? '#4ade80' : '#f87171' }}>
-                  {trend.ping.direction === 'faster' ? '↓' : '↑'} {trend.ping.delta}ms {trend.ping.direction}
-                </div>
-              )}
-              {windowLoading && (
-                <div className="absolute inset-0 flex items-center justify-center z-10 rounded"
-                  style={{ backgroundColor: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.6)' }}>
-                  <span className="text-xs font-mono" style={{ color: t.textFaint }}>Loading…</span>
-                </div>
-              )}
-              {chartData.length > 0 ? (
-                <div ref={chartRef} style={{ width: '100%', height: 100 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 4, right: 44, left: 0, bottom: 4 }}>
-                      <defs>
-                        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%"  stopColor={lineColor} stopOpacity={0.25} />
-                          <stop offset="95%" stopColor={lineColor} stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid horizontal vertical={false} stroke={t.metricGap} strokeOpacity={0.6} />
-                      <YAxis orientation="right" width={36} tickCount={3} tickFormatter={v => `${v}ms`}
-                        tick={{ fontSize: 9, fontFamily: 'monospace', fill: t.textFaint }}
-                        axisLine={false} tickLine={false} />
-                      <Area type="monotone" dataKey="ping" stroke={lineColor} strokeWidth={1.5}
-                        fill={`url(#${gradientId})`}
-                        dot={(props) => {
-                          const { cx, cy, payload } = props;
-                          if (!cx || !cy || payload?.status !== 'down') return <circle r={0} key={props.index} />;
-                          return <circle key={props.index} cx={cx} cy={cy} r={3} fill="#ef4444" style={{ pointerEvents: 'none' }} />;
-                        }}
-                        activeDot={{ r: 3, fill: lineColor, strokeWidth: 0 }} isAnimationActive={false} />
-                      {monitor.degradedThreshold != null && isHttpLike && (
-                        <ReferenceLine y={monitor.degradedThreshold} stroke="#f59e0b" strokeDasharray="4 3" strokeWidth={1} />
-                      )}
-                      <Tooltip content={tooltipContent} cursor={{ stroke: t.cardBorder, strokeWidth: 1 }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-24 text-xs font-mono" style={{ color: t.textFaint }}>
-                  awaiting first check…
-                </div>
-              )}
+        {/* ── Current status strip ── */}
+        <div className="px-8 py-3 border-b flex items-center gap-3 flex-wrap" style={{ borderColor: t.metricGap }}>
+          <span className="text-xs font-mono font-bold" style={{ color: statusColor }}>
+            {(displayStatus ?? 'pending').toUpperCase()}
+          </span>
+          <span style={{ color: t.textFaint }}>·</span>
+          <span className="text-xs font-mono" style={{ color: t.textMuted }}>
+            {monitor.lastChecked ? `checked ${formatTimestamp(monitor.lastChecked)}` : 'not yet checked'}
+          </span>
+          <span style={{ color: t.textFaint }}>·</span>
+          <span className="text-xs font-mono" style={{ color: t.textMuted }}>
+            every {formatInterval(monitor.interval)}
+          </span>
+          {monitor.latest?.certDays != null && (
+            <>
+              <span style={{ color: t.textFaint }}>·</span>
+              <span className="text-xs font-mono" style={{
+                color: monitor.latest.certDays > 30 ? '#4ade80' : monitor.latest.certDays > 7 ? '#fbbf24' : '#f87171'
+              }}>
+                🔒 {monitor.latest.certDays}d
+              </span>
+            </>
+          )}
+        </div>
+
+        {/* ── Stats card grid ── */}
+        <div className="px-8 py-5 border-b grid grid-cols-2 md:grid-cols-4 gap-3" style={{ borderColor: t.metricGap }}>
+          {[
+            { label: 'Uptime', value: uptimePctDisplay, color: uptimeColor, sub: trend.uptime ? `${trend.uptime.direction === 'up' ? '↑' : '↓'} ${trend.uptime.delta}% trend` : null },
+            { label: 'Avg Response', value: avgDisplay, color: t.textSecondary, sub: trend.ping ? `${trend.ping.direction === 'faster' ? '↓' : '↑'} ${trend.ping.delta}ms ${trend.ping.direction}` : null },
+            { label: historyWindow === '1h' ? 'P95' : 'Best', value: p95Display, color: t.textSecondary, sub: historyWindow === '1h' ? '95th percentile' : 'best in window' },
+            { label: 'Incidents', value: String(stats.incidents), color: stats.incidents > 0 ? '#f87171' : t.textFaint, sub: 'this window' },
+          ].map(({ label, value, color, sub }) => (
+            <div key={label} className="rounded-lg border px-4 py-3 flex flex-col gap-1"
+              style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', borderColor: t.metricGap }}>
+              <div className="text-[10px] font-mono uppercase tracking-wider" style={{ color: t.textFaint }}>{label}</div>
+              <div className="text-2xl font-mono font-bold" style={{ color }}>{value}</div>
+              {sub && <div className="text-[10px] font-mono" style={{ color: t.textFaint }}>{sub}</div>}
             </div>
+          ))}
+        </div>
 
-            {/* Timing waterfall */}
-            {isHttpLike && monitor.latest?.dnsMs != null && (
-              <div className="flex items-center gap-3 flex-wrap pt-1 border-t" style={{ borderColor: t.metricGap }}>
-                <span className="text-[10px] font-mono uppercase tracking-wider shrink-0 mr-1" style={{ color: t.textFaint }}>Latest</span>
-                <TimingChip label="DNS"  value={monitor.latest.dnsMs}  color="#3b82f6" t={t} />
-                <TimingChip label="TCP"  value={monitor.latest.tcpMs}  color="#22c55e" t={t} />
-                {monitor.latest.tlsMs != null && <TimingChip label="TLS" value={monitor.latest.tlsMs} color="#f59e0b" t={t} />}
-                <TimingChip label="TTFB" value={monitor.latest.ttfbMs} color="#a78bfa" t={t} />
-                {monitor.latest.httpStatus != null && (
-                  <span className={`text-xs font-mono ml-auto ${monitor.latest.httpStatus < 400 ? '' : 'text-red-400'}`}
-                    style={monitor.latest.httpStatus < 400 ? { color: t.textFaint } : {}}>
-                    HTTP {monitor.latest.httpStatus}
-                  </span>
+        {/* ── Period comparison row ── */}
+        <div className="px-8 py-4 border-b grid grid-cols-3 gap-3" style={{ borderColor: t.metricGap }}>
+          {[
+            { key: '1d', label: 'Last 24 Hours' },
+            { key: '1w', label: 'Last 7 Days'   },
+            { key: '30d', label: 'Last 30 Days' },
+          ].map(({ key, label }) => {
+            const ps = periodStats?.[key];
+            const pColor = ps == null ? t.textFaint : ps.uptimePct >= 99 ? '#4ade80' : ps.uptimePct >= 95 ? '#fbbf24' : '#f87171';
+            return (
+              <div key={key} className="rounded-lg border px-4 py-3 flex flex-col gap-1"
+                style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', borderColor: t.metricGap }}>
+                <div className="text-[10px] font-mono uppercase tracking-wider" style={{ color: t.textFaint }}>{label}</div>
+                {ps == null ? (
+                  <div className="h-6 rounded animate-pulse" style={{ backgroundColor: t.metricGap }} />
+                ) : (
+                  <>
+                    <div className="text-lg font-mono font-bold" style={{ color: pColor }}>
+                      {ps.uptimePct != null ? `${ps.uptimePct}%` : '—'}
+                    </div>
+                    <div className="text-[10px] font-mono" style={{ color: ps.incidents > 0 ? '#f87171' : t.textFaint }}>
+                      {ps.incidents} incident{ps.incidents !== 1 ? 's' : ''}
+                    </div>
+                  </>
                 )}
               </div>
+            );
+          })}
+        </div>
+
+        {/* ── Response time chart ── */}
+        <div className="px-8 pt-5 pb-3 border-b" style={{ borderColor: t.metricGap }}>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-mono font-semibold" style={{ color: t.textSecondary }}>Response Time</span>
+            {trend.ping && (
+              <span className="text-[10px] font-mono opacity-75"
+                style={{ color: trend.ping.direction === 'faster' ? '#4ade80' : '#f87171' }}>
+                {trend.ping.direction === 'faster' ? '↓' : '↑'} {trend.ping.delta}ms {trend.ping.direction}
+              </span>
             )}
           </div>
-
-          {/* Tab bar */}
-          <div className="flex border-b border-t shrink-0" style={{ borderColor: t.metricGap }}>
-            {[
-              { id: 'history',   label: 'History'   },
-              { id: 'incidents', label: 'Incidents'  },
-              { id: 'configure', label: 'Configure'  },
-              { id: 'embed',     label: 'Embed'      },
-            ].map(tab => (
-              <button key={tab.id} onClick={() => switchTab(tab.id)}
-                className="px-5 py-2.5 text-xs font-mono font-semibold transition-colors border-b-2 -mb-px"
-                style={{
-                  color:           activeTab === tab.id ? '#60a5fa' : t.textMuted,
-                  borderColor:     activeTab === tab.id ? '#60a5fa' : 'transparent',
-                  backgroundColor: 'transparent',
-                }}>
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab content — flows naturally, main column scrolls */}
-          <div className="flex-1">
-            {activeTab === 'history'   && <HistoryTab   history={history} t={t} isDark={isDark} />}
-            {activeTab === 'incidents' && <IncidentsTab history={history} t={t} isDark={isDark} initialIncidentTimestamp={initialIncidentTimestamp} />}
-            {activeTab === 'embed'     && <EmbedTab monitor={monitor} t={t} />}
-            {activeTab === 'configure' && (
-              <div className="flex flex-col">
-                <MonitorForm embedded editingMonitor={monitor} onSubmit={handleSave}
-                  onCancel={handleClose} submitting={submitting} allTags={allTags} error={formError} />
-                {/* Sticky footer for width toggle + delete */}
-                <div className="sticky bottom-0 border-t px-4 py-3 flex items-center justify-between gap-3"
-                  style={{ borderColor: t.metricGap, backgroundColor: t.cardBg }}>
-                  <div className="flex items-center gap-2">
-                    <ArrowLeftRight size={12} style={{ color: t.textFaint }} />
-                    <span className="text-xs font-mono" style={{ color: t.textFaint }}>Width</span>
-                    <div className="flex rounded border overflow-hidden" style={{ borderColor: t.cardBorder }}>
-                      {[1, 2].map(w => (
-                        <button key={w} type="button" onClick={() => onSetWidth?.(w)}
-                          className="px-2.5 py-1 text-xs font-mono transition-colors"
-                          style={width === w
-                            ? { backgroundColor: 'rgba(59,130,246,0.2)', color: '#93c5fd' }
-                            : { backgroundColor: t.inputBg, color: t.textMuted }}>
-                          {w === 1 ? 'Narrow' : 'Wide'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    {deleteError && <span className="text-xs font-mono text-red-400">{deleteError}</span>}
-                    {confirmDelete ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono" style={{ color: '#f87171' }}>Sure?</span>
-                        <button type="button" onClick={handleDelete}
-                          className="px-2.5 py-1 text-xs font-mono rounded border"
-                          style={{ backgroundColor: 'rgba(239,68,68,0.15)', borderColor: 'rgba(239,68,68,0.4)', color: '#f87171' }}>
-                          Delete
-                        </button>
-                        <button type="button" onClick={() => setConfirmDelete(false)}
-                          className="px-2.5 py-1 text-xs font-mono rounded border"
-                          style={{ color: t.textMuted, borderColor: t.cardBorder, backgroundColor: t.inputBg }}>
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button type="button" onClick={() => setConfirmDelete(true)}
-                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded border"
-                        style={{ color: t.textMuted, borderColor: t.cardBorder, backgroundColor: t.inputBg }}>
-                        <Trash2 size={11} /> Delete
-                      </button>
+          <div className="relative">
+            {windowLoading && (
+              <div className="absolute inset-0 flex items-center justify-center z-10 rounded"
+                style={{ backgroundColor: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.6)' }}>
+                <span className="text-xs font-mono" style={{ color: t.textFaint }}>Loading…</span>
+              </div>
+            )}
+            {chartData.length > 0 ? (
+              <div ref={chartRef} style={{ width: '100%', height: 100 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData} margin={{ top: 4, right: 44, left: 0, bottom: 4 }}>
+                    <defs>
+                      <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%"  stopColor={lineColor} stopOpacity={0.25} />
+                        <stop offset="95%" stopColor={lineColor} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid horizontal vertical={false} stroke={t.metricGap} strokeOpacity={0.6} />
+                    <YAxis orientation="right" width={36} tickCount={3} tickFormatter={v => `${v}ms`}
+                      tick={{ fontSize: 9, fontFamily: 'monospace', fill: t.textFaint }}
+                      axisLine={false} tickLine={false} />
+                    <Area type="monotone" dataKey="ping" stroke={lineColor} strokeWidth={1.5}
+                      fill={`url(#${gradientId})`}
+                      dot={(props) => {
+                        const { cx, cy, payload } = props;
+                        if (!cx || !cy || payload?.status !== 'down') return <circle r={0} key={props.index} />;
+                        return <circle key={props.index} cx={cx} cy={cy} r={3} fill="#ef4444" style={{ pointerEvents: 'none' }} />;
+                      }}
+                      activeDot={{ r: 3, fill: lineColor, strokeWidth: 0 }} isAnimationActive={false} />
+                    {monitor.degradedThreshold != null && isHttpLike && (
+                      <ReferenceLine y={monitor.degradedThreshold} stroke="#f59e0b" strokeDasharray="4 3" strokeWidth={1} />
                     )}
-                  </div>
-                </div>
+                    <Tooltip content={tooltipContent} cursor={{ stroke: t.cardBorder, strokeWidth: 1 }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-24 text-xs font-mono" style={{ color: t.textFaint }}>
+                awaiting first check…
               </div>
             )}
           </div>
         </div>
 
-        {/* ── Sidebar (hidden on mobile) ── */}
-        <div className="hidden md:flex w-72 shrink-0 flex-col border-l overflow-y-auto"
-          style={{ borderColor: t.metricGap, backgroundColor: isDark ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.02)' }}>
-          <div className="p-5 space-y-4">
-
-            {/* Status section */}
-            <div className="space-y-2">
-              <StatusPill status={displayStatus} size="lg" />
-              <div className="text-xs font-mono" style={{ color: t.textFaint }}>
-                {monitor.lastChecked
-                  ? <>Last checked {formatTimestamp(monitor.lastChecked)}</>
-                  : 'Not yet checked'}
-              </div>
-              {isHttpLike && (
-                <a href={targetHref} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs font-mono truncate hover:underline"
-                  style={{ color: t.textMuted }}>
-                  {monitor.target}<ExternalLink size={10} className="shrink-0 opacity-60 ml-0.5" />
-                </a>
-              )}
-            </div>
-
-            {/* Divider */}
-            <div style={{ borderTop: `1px solid ${t.metricGap}` }} />
-
-            {/* Stats */}
-            <div>
-              <div className="text-[10px] font-mono uppercase tracking-wider mb-2" style={{ color: t.textFaint }}>
-                {historyWindow} window
-              </div>
-              <SidebarStat label="Uptime"    value={uptimePctDisplay} valueColor={uptimeColor} t={t} />
-              <SidebarStat label="Avg response" value={avgDisplay} t={t} />
-              <SidebarStat label={historyWindow === '1h' ? 'P95' : 'Best'} value={p95Display} t={t} />
-              <SidebarStat label="Incidents" value={String(stats.incidents)}
-                valueColor={stats.incidents > 0 ? '#f87171' : t.textFaint} t={t} />
-              {trend.ping && (
-                <SidebarStat label="Trend"
-                  value={`${trend.ping.direction === 'faster' ? '↓' : '↑'} ${trend.ping.delta}ms ${trend.ping.direction}`}
-                  valueColor={trend.ping.direction === 'faster' ? '#4ade80' : '#f87171'} t={t} />
-              )}
-            </div>
-
-            {/* Divider */}
-            <div style={{ borderTop: `1px solid ${t.metricGap}` }} />
-
-            {/* Metadata */}
-            <div>
-              <div className="text-[10px] font-mono uppercase tracking-wider mb-2" style={{ color: t.textFaint }}>
-                Configuration
-              </div>
-              <SidebarStat label="Interval" value={formatInterval(monitor.interval)} t={t} />
-              {monitor.latest?.certDays != null && (
-                <SidebarStat label="SSL cert"
-                  value={`${monitor.latest.certDays}d`}
-                  valueColor={monitor.latest.certDays > 30 ? '#4ade80' : monitor.latest.certDays > 7 ? '#fbbf24' : '#f87171'}
-                  t={t} />
-              )}
-              {monitor.tags?.filter(t => t !== '_ref').length > 0 && (
-                <div className="py-2 border-b text-xs font-mono flex flex-wrap gap-1" style={{ borderColor: t.metricGap }}>
-                  {monitor.tags.filter(tag => tag !== '_ref').map(tag => (
-                    <span key={tag} className="px-1.5 py-0.5 rounded text-[10px]"
-                      style={{ color: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.2)' }}>
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
+        {/* ── Status history blocks ── */}
+        <div className="px-8 py-4 border-b" style={{ borderColor: t.metricGap }}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: t.textFaint }}>Status History</span>
+            {stats.uptimePct != null && <span className="text-[10px] font-mono" style={{ color: uptimeColor }}>{stats.uptimePct}% up</span>}
           </div>
+          <UptimeBlocks history={history} count={60} blockHeight={12} />
+        </div>
+
+        {/* ── Timing waterfall ── */}
+        {isHttpLike && monitor.latest?.dnsMs != null && (
+          <div className="px-8 py-3 border-b flex items-center gap-3 flex-wrap" style={{ borderColor: t.metricGap }}>
+            <span className="text-[10px] font-mono uppercase tracking-wider shrink-0 mr-1" style={{ color: t.textFaint }}>Latest</span>
+            <TimingChip label="DNS"  value={monitor.latest.dnsMs}  color="#3b82f6" t={t} />
+            <TimingChip label="TCP"  value={monitor.latest.tcpMs}  color="#22c55e" t={t} />
+            {monitor.latest.tlsMs != null && <TimingChip label="TLS" value={monitor.latest.tlsMs} color="#f59e0b" t={t} />}
+            <TimingChip label="TTFB" value={monitor.latest.ttfbMs} color="#a78bfa" t={t} />
+            {monitor.latest.httpStatus != null && (
+              <span className={`text-xs font-mono ml-auto ${monitor.latest.httpStatus < 400 ? '' : 'text-red-400'}`}
+                style={monitor.latest.httpStatus < 400 ? { color: t.textFaint } : {}}>
+                HTTP {monitor.latest.httpStatus}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* ── Tab bar ── */}
+        <div className="flex border-b" style={{ borderColor: t.metricGap }}>
+          {[
+            { id: 'history',   label: 'History'   },
+            { id: 'incidents', label: 'Incidents'  },
+            { id: 'configure', label: 'Configure'  },
+            { id: 'embed',     label: 'Embed'      },
+          ].map(tab => (
+            <button key={tab.id} onClick={() => switchTab(tab.id)}
+              className="px-5 py-3 text-xs font-mono font-semibold transition-colors border-b-2 -mb-px flex items-center gap-1"
+              style={{
+                color:           activeTab === tab.id ? '#60a5fa' : t.textMuted,
+                borderColor:     activeTab === tab.id ? '#60a5fa' : 'transparent',
+                backgroundColor: 'transparent',
+              }}>
+              {tab.label}
+              {tab.id === 'incidents' && stats.incidents > 0 && (
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Tab content — natural flow ── */}
+        <div>
+          {activeTab === 'history'   && <HistoryTab   history={history} t={t} isDark={isDark} />}
+          {activeTab === 'incidents' && <IncidentsTab history={history} t={t} isDark={isDark} initialIncidentTimestamp={initialIncidentTimestamp} />}
+          {activeTab === 'embed'     && <EmbedTab monitor={monitor} t={t} />}
+          {activeTab === 'configure' && (
+            <div className="flex flex-col">
+              <MonitorForm embedded editingMonitor={monitor} onSubmit={handleSave}
+                onCancel={handleClose} submitting={submitting} allTags={allTags} error={formError} />
+              <div className="sticky bottom-0 border-t px-4 py-3 flex items-center justify-between gap-3"
+                style={{ borderColor: t.metricGap, backgroundColor: t.cardBg }}>
+                <div className="flex items-center gap-2">
+                  <ArrowLeftRight size={12} style={{ color: t.textFaint }} />
+                  <span className="text-xs font-mono" style={{ color: t.textFaint }}>Width</span>
+                  <div className="flex rounded border overflow-hidden" style={{ borderColor: t.cardBorder }}>
+                    {[1, 2].map(w => (
+                      <button key={w} type="button" onClick={() => onSetWidth?.(w)}
+                        className="px-2.5 py-1 text-xs font-mono transition-colors"
+                        style={width === w
+                          ? { backgroundColor: 'rgba(59,130,246,0.2)', color: '#93c5fd' }
+                          : { backgroundColor: t.inputBg, color: t.textMuted }}>
+                        {w === 1 ? 'Narrow' : 'Wide'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  {deleteError && <span className="text-xs font-mono text-red-400">{deleteError}</span>}
+                  {confirmDelete ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono" style={{ color: '#f87171' }}>Sure?</span>
+                      <button type="button" onClick={handleDelete}
+                        className="px-2.5 py-1 text-xs font-mono rounded border"
+                        style={{ backgroundColor: 'rgba(239,68,68,0.15)', borderColor: 'rgba(239,68,68,0.4)', color: '#f87171' }}>
+                        Delete
+                      </button>
+                      <button type="button" onClick={() => setConfirmDelete(false)}
+                        className="px-2.5 py-1 text-xs font-mono rounded border"
+                        style={{ color: t.textMuted, borderColor: t.cardBorder, backgroundColor: t.inputBg }}>
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={() => setConfirmDelete(true)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded border"
+                      style={{ color: t.textMuted, borderColor: t.cardBorder, backgroundColor: t.inputBg }}>
+                      <Trash2 size={11} /> Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

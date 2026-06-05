@@ -217,7 +217,7 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
 
         // ── version ──────────────────────────────────────────────────────
         case 'version':
-          emit({ type: 'output', text: 'NetWatch v6.4.5' });
+          emit({ type: 'output', text: 'NetWatch v6.5.0' });
           break;
 
         // ── help ─────────────────────────────────────────────────────────

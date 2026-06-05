@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Radio, Activity, AlertTriangle, Bell, Tag as TagIcon, Settings, Code, X, Menu, Search, Zap } from 'lucide-react';
+import { Plus, Radio, Activity, AlertTriangle, Bell, Tag as TagIcon, Settings, Code, X, Menu, Search, Zap, ChevronDown, Check } from 'lucide-react';
 import {
   DndContext, closestCenter,
   KeyboardSensor, PointerSensor,
@@ -335,7 +335,7 @@ export default function App() {
             </span>
             <span className="hidden sm:inline text-xs font-mono px-2 py-0.5 rounded border"
               style={{ color: t.textFaint, borderColor: t.cardBorder }}>
-              netwatch · v6.4.5
+              netwatch · v6.5.0
             </span>
           </div>
 
@@ -780,196 +780,164 @@ function StatusFilterGroup({ value, onChange, t, isDark }) {
   );
 }
 
+const PRESET_LABELS = {
+  '15m': 'Last 15 Minutes',
+  '1h':  'Last 1 Hour',
+  '6h':  'Last 6 Hours',
+  '12h': 'Last 12 Hours',
+  '1d':  'Last 24 Hours',
+  '1w':  'Last 7 Days',
+  '30d': 'Last 30 Days',
+};
+
 function HistoryRangeControl({ historyRange, onChange, t, isDark }) {
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [draftFrom,  setDraftFrom]  = useState('');
-  const [draftTo,    setDraftTo]    = useState('');
+  const [menuOpen,       setMenuOpen]       = useState(false);
+  const [customExpanded, setCustomExpanded] = useState(false);
+  const [draftFrom,      setDraftFrom]      = useState('');
+  const [draftTo,        setDraftTo]        = useState('');
   const wrapRef = useRef(null);
 
   useEffect(() => {
-    if (!pickerOpen) return;
-    const handler = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setPickerOpen(false);
+    if (!menuOpen) return;
+    const onMouse = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+        setMenuOpen(false); setCustomExpanded(false);
+      }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [pickerOpen]);
+    const onKey = (e) => {
+      if (e.key === 'Escape') { setMenuOpen(false); setCustomExpanded(false); }
+    };
+    document.addEventListener('mousedown', onMouse);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onMouse);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
 
-  const isCustomActive = historyRange.type === 'custom' || historyRange.type === 'zoom';
+  const isRangeActive = historyRange.type === 'custom' || historyRange.type === 'zoom';
+  const isZoom        = historyRange.type === 'zoom';
 
-  const clearRange = () => onChange({ type: 'preset', value: '1h' });
+  const clearRange   = () => { onChange({ type: 'preset', value: '1h' }); setMenuOpen(false); setCustomExpanded(false); };
+  const selectPreset = (value) => { onChange({ type: 'preset', value }); setMenuOpen(false); setCustomExpanded(false); };
 
   const applyCustom = () => {
     if (!draftFrom || !draftTo) return;
-    onChange({
-      type: 'custom',
-      from: new Date(draftFrom).toISOString(),
-      to:   new Date(draftTo).toISOString(),
-    });
-    setPickerOpen(false);
+    onChange({ type: 'custom', from: new Date(draftFrom).toISOString(), to: new Date(draftTo).toISOString() });
+    setMenuOpen(false); setCustomExpanded(false);
   };
 
-  const formatActiveLabel = () => {
+  const getTriggerLabel = () => {
+    if (historyRange.type === 'preset') return PRESET_LABELS[historyRange.value] ?? historyRange.value;
     if (historyRange.type === 'zoom') {
-      const d = new Date(historyRange.incidentAt);
-      const s = d.toLocaleString('en-US', {
-        month: 'short', day: 'numeric',
-        hour: '2-digit', minute: '2-digit', hour12: false,
+      const s = new Date(historyRange.incidentAt).toLocaleString('en-US', {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
       });
-      return { isZoom: true, text: `${s} ±30m` };
+      return `${s} ±30m`;
     }
     const from = new Date(historyRange.from);
     const to   = new Date(historyRange.to);
-    const sameDay = from.toDateString() === to.toDateString();
-    const fStr = from.toLocaleString('en-US', {
-      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
-    });
-    const tStr = sameDay
+    const fStr = from.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+    const tStr = from.toDateString() === to.toDateString()
       ? to.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
-      : to.toLocaleString('en-US', {
-          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
-        });
-    return { isZoom: false, text: `${fStr} – ${tStr}` };
+      : to.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+    return `${fStr} – ${tStr}`;
   };
+
+  const triggerActive = isRangeActive || menuOpen;
+  const accentColor  = isZoom ? '#f59e0b' : '#60a5fa';
+  const accentBorder = isZoom ? 'rgba(245,158,11,0.35)' : '#60a5fa';
+  const accentBg     = isZoom ? 'rgba(245,158,11,0.12)' : (isDark ? 'rgba(96,165,250,0.12)' : 'rgba(59,130,246,0.08)');
 
   return (
     <div className="relative flex items-center gap-1 shrink-0" ref={wrapRef}>
       <span className="text-xs font-mono" style={{ color: t.textFaint }}>History</span>
 
-      {isCustomActive ? (
-        // Active range badge
-        (() => {
-          const { isZoom, text } = formatActiveLabel();
-          const color = isZoom ? '#f59e0b' : '#60a5fa';
-          const bg    = isZoom ? 'rgba(245,158,11,0.12)' : 'rgba(96,165,250,0.12)';
-          const border = isZoom ? 'rgba(245,158,11,0.35)' : 'rgba(96,165,250,0.35)';
-          return (
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs font-mono"
-              style={{ color, backgroundColor: bg, borderColor: border }}>
-              {isZoom && <Zap size={10} />}
-              <span>{text}</span>
-              <button
-                onClick={clearRange}
-                className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity"
-                title="Clear range">
-                <X size={10} />
-              </button>
-            </div>
-          );
-        })()
-      ) : (
-        // Preset pill group + Custom button
-        <div className="flex items-center">
-          {HISTORY_PRESETS.map((o, i) => {
-            const isActive = historyRange.type === 'preset' && historyRange.value === o.value;
-            const isFirst  = i === 0;
-            return (
-              <button
-                key={o.value}
-                onClick={() => { onChange({ type: 'preset', value: o.value }); setPickerOpen(false); }}
-                className="px-2 py-0.5 text-xs font-mono border transition-all"
-                style={{
-                  borderRadius:    isFirst ? '0.375rem 0 0 0.375rem' : '0',
-                  marginLeft:      i > 0 ? '-1px' : 0,
-                  position:        'relative',
-                  zIndex:          isActive ? 1 : 0,
-                  backgroundColor: isActive
-                    ? isDark ? 'rgba(96,165,250,0.15)' : 'rgba(59,130,246,0.1)'
-                    : isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                  borderColor: isActive ? '#60a5fa' : t.cardBorder,
-                  color:       isActive ? '#60a5fa' : t.textMuted,
-                }}>
-                {o.label}
-              </button>
-            );
-          })}
-          <button
-            onClick={() => setPickerOpen(p => !p)}
-            className="px-2 py-0.5 text-xs font-mono border transition-all"
-            style={{
-              borderRadius:    '0 0.375rem 0.375rem 0',
-              marginLeft:      '-1px',
-              position:        'relative',
-              zIndex:          pickerOpen ? 2 : 0,
-              backgroundColor: pickerOpen
-                ? isDark ? 'rgba(96,165,250,0.15)' : 'rgba(59,130,246,0.1)'
-                : isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-              borderColor: pickerOpen ? '#60a5fa' : t.cardBorder,
-              color:       pickerOpen ? '#60a5fa' : t.textMuted,
-            }}>
-            Custom
-          </button>
-        </div>
-      )}
+      {/* Trigger button */}
+      <button
+        onClick={() => setMenuOpen(p => !p)}
+        className="h-7 px-3 text-xs font-mono rounded-lg border transition-colors flex items-center gap-1.5 max-w-[220px]"
+        style={{
+          backgroundColor: triggerActive ? accentBg     : t.cardBg,
+          borderColor:     triggerActive ? accentBorder : t.cardBorder,
+          color:           triggerActive ? accentColor  : t.textSecondary,
+        }}>
+        {isZoom && <Zap size={10} />}
+        <span className="truncate">{getTriggerLabel()}</span>
+        {isRangeActive ? (
+          <span role="button" title="Clear range"
+            onClick={e => { e.stopPropagation(); clearRange(); }}
+            className="opacity-60 hover:opacity-100 transition-opacity shrink-0">
+            <X size={10} />
+          </span>
+        ) : (
+          <ChevronDown size={12} className="shrink-0" style={{ transform: menuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+        )}
+      </button>
 
-      {/* Date range picker panel */}
-      {pickerOpen && (
-        <div
-          className="absolute top-full mt-1.5 z-30 rounded-lg border shadow-2xl p-3 space-y-2.5"
+      {/* Dropdown menu */}
+      {menuOpen && (
+        <div className="absolute top-full mt-1 right-0 z-30 rounded-lg border shadow-2xl py-1"
           style={{
-            right:           0,
             backgroundColor: t.cardBg,
             borderColor:     t.cardBorder,
-            minWidth:        268,
+            minWidth:        192,
             boxShadow: isDark
               ? '0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)'
               : '0 16px 48px rgba(0,0,0,0.15)',
           }}>
-          <div className="text-xs font-mono uppercase tracking-wider pb-0.5"
-            style={{ color: t.textFaint }}>
-            Custom range
-          </div>
-          <div className="space-y-2">
-            <div>
-              <label className="block text-xs font-mono mb-1" style={{ color: t.textMuted }}>
-                From
-              </label>
-              <input
-                type="datetime-local"
-                value={draftFrom}
-                onChange={e => setDraftFrom(e.target.value)}
-                className="w-full rounded border px-2 py-1.5 text-xs font-mono
-                           focus:outline-none focus:ring-2 focus:ring-blue-500/20
-                           focus:border-blue-500/50 transition-all"
-                style={{ backgroundColor: t.inputBg, color: t.textPrimary, borderColor: t.cardBorder }}
-              />
+
+          {/* Preset items */}
+          {Object.entries(PRESET_LABELS).map(([value, label]) => {
+            const isActive = historyRange.type === 'preset' && historyRange.value === value;
+            return (
+              <button key={value} onClick={() => selectPreset(value)}
+                className="w-full px-3 py-1.5 text-xs font-mono flex items-center justify-between transition-colors text-left"
+                style={{ color: isActive ? '#60a5fa' : t.textSecondary, backgroundColor: 'transparent' }}
+                onMouseEnter={e => { e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'; }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}>
+                <span>{label}</span>
+                {isActive && <Check size={11} style={{ color: '#60a5fa' }} />}
+              </button>
+            );
+          })}
+
+          {/* Divider */}
+          <div className="my-1 border-t" style={{ borderColor: t.metricGap }} />
+
+          {/* Custom Range toggle */}
+          <button
+            onClick={() => setCustomExpanded(p => !p)}
+            className="w-full px-3 py-1.5 text-xs font-mono flex items-center justify-between transition-colors text-left"
+            style={{ color: t.textMuted, backgroundColor: 'transparent' }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'; }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}>
+            <span>Custom Range…</span>
+            <ChevronDown size={11} style={{ transform: customExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+          </button>
+
+          {/* Inline custom date inputs */}
+          {customExpanded && (
+            <div className="px-3 pb-2 pt-1 space-y-2">
+              <div>
+                <div className="text-[10px] font-mono uppercase tracking-wider mb-1" style={{ color: t.textFaint }}>From</div>
+                <input type="datetime-local" value={draftFrom} onChange={e => setDraftFrom(e.target.value)}
+                  className="w-full rounded border px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 transition-all"
+                  style={{ backgroundColor: t.inputBg, color: t.textPrimary, borderColor: t.cardBorder }} />
+              </div>
+              <div>
+                <div className="text-[10px] font-mono uppercase tracking-wider mb-1" style={{ color: t.textFaint }}>To</div>
+                <input type="datetime-local" value={draftTo} onChange={e => setDraftTo(e.target.value)}
+                  className="w-full rounded border px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 transition-all"
+                  style={{ backgroundColor: t.inputBg, color: t.textPrimary, borderColor: t.cardBorder }} />
+              </div>
+              <button onClick={applyCustom} disabled={!draftFrom || !draftTo}
+                className="w-full px-3 py-1.5 rounded text-xs font-mono font-bold transition-all disabled:opacity-40"
+                style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: '#fff', boxShadow: '0 2px 8px rgba(59,130,246,0.35)' }}>
+                Apply Range
+              </button>
             </div>
-            <div>
-              <label className="block text-xs font-mono mb-1" style={{ color: t.textMuted }}>
-                To
-              </label>
-              <input
-                type="datetime-local"
-                value={draftTo}
-                onChange={e => setDraftTo(e.target.value)}
-                className="w-full rounded border px-2 py-1.5 text-xs font-mono
-                           focus:outline-none focus:ring-2 focus:ring-blue-500/20
-                           focus:border-blue-500/50 transition-all"
-                style={{ backgroundColor: t.inputBg, color: t.textPrimary, borderColor: t.cardBorder }}
-              />
-            </div>
-          </div>
-          <div className="flex items-center justify-between pt-1 border-t"
-            style={{ borderColor: t.cardBorder }}>
-            <button
-              onClick={() => setPickerOpen(false)}
-              className="text-xs font-mono opacity-50 hover:opacity-100 transition-opacity"
-              style={{ color: t.textMuted }}>
-              Cancel
-            </button>
-            <button
-              onClick={applyCustom}
-              disabled={!draftFrom || !draftTo}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono
-                         font-bold transition-all disabled:opacity-40"
-              style={{
-                background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                color:      '#fff',
-                boxShadow:  '0 2px 8px rgba(59,130,246,0.35)',
-              }}>
-              Apply
-            </button>
-          </div>
+          )}
         </div>
       )}
     </div>
