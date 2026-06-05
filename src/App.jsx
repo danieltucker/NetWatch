@@ -174,11 +174,6 @@ export default function App() {
     }
   }, [historyRange]);
 
-  // ── Incident dot click — open modal on Incidents tab at that timestamp ──────
-  const handleIncidentClick = useCallback((mon, timestamp) => {
-    setIncidentTimestamp(timestamp);
-    openDetail(mon, 'incidents');
-  }, [openDetail]);
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const userMonitors = monitors.filter(m => !m.tags?.includes('_ref'));
@@ -263,6 +258,13 @@ export default function App() {
     setDetailMonitor(m);
     setDetailTab(tab);
   }, []);
+
+  // Defined after openDetail to avoid temporal dead zone — openDetail is a
+  // const so referencing it before this line would cause a ReferenceError.
+  const handleIncidentClick = useCallback((mon, timestamp) => {
+    setIncidentTimestamp(timestamp);
+    openDetail(mon, 'incidents');
+  }, [openDetail]);
 
   const handleAddModule = (moduleId) => {
     closeForm();

@@ -14,7 +14,8 @@ export default defineConfig({
   },
   build: {
     // Output the production bundle where Express expects to find it
-    outDir: 'server/public',
+    outDir:     'server/public',
     emptyOutDir: true,
+
   },
 });
