@@ -6,6 +6,11 @@ const router = Router();
 
 router.use(requireApiKey);
 
+// NOTE: check_history.checked_at is stored as ISO-8601 UTC ('...T...Z'). When
+// filtering by a time window we use strftime('%Y-%m-%dT%H:%M:%fZ', 'now', <span>)
+// so the comparison value matches that exact format — NOT datetime('now', ...),
+// which yields a space-separated form and breaks the lexical TEXT comparison.
+
 // ── GET /api/v1/monitors ──────────────────────────────────────────────────────
 
 router.get('/monitors', (_req, res) => {
@@ -25,11 +30,11 @@ router.get('/monitors', (_req, res) => {
     const upCount = db.prepare(`
       SELECT COUNT(*) AS n FROM check_history
       WHERE  monitor_id = ? AND status = 'up'
-        AND  checked_at >= datetime('now', '-1 day')
+        AND  checked_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 day')
     `).get(m.id)?.n ?? 0;
     const total = db.prepare(`
       SELECT COUNT(*) AS n FROM check_history
-      WHERE  monitor_id = ? AND checked_at >= datetime('now', '-1 day')
+      WHERE  monitor_id = ? AND checked_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 day')
     `).get(m.id)?.n ?? 0;
 
     return {
@@ -147,11 +152,11 @@ router.get('/metrics', (_req, res) => {
     const upCount = db.prepare(`
       SELECT COUNT(*) AS n FROM check_history
       WHERE  monitor_id = ? AND status = 'up'
-        AND  checked_at >= datetime('now', '-1 day')
+        AND  checked_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 day')
     `).get(m.id)?.n ?? 0;
     const total = db.prepare(`
       SELECT COUNT(*) AS n FROM check_history
-      WHERE  monitor_id = ? AND checked_at >= datetime('now', '-1 day')
+      WHERE  monitor_id = ? AND checked_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 day')
     `).get(m.id)?.n ?? 0;
     const uptimeVal = total ? String(Math.round((upCount / total) * 1000) / 10) : 'NaN';
 

@@ -185,10 +185,14 @@ export async function executeCheck(monitor) {
   // Uptime % from the last hour — matches the 1h window the GET endpoint uses by default.
   // Using a time-range query (not LIMIT N) keeps SSE values consistent with what
   // the client computed from the windowed history on page load.
+  // NOTE: checked_at is ISO-8601 UTC ('...T...Z'); bind a JS-computed ISO cutoff
+  // rather than datetime('now','-1 hour') (space-separated) so the TEXT comparison
+  // is ISO-vs-ISO. See the WINDOWS note in routes/monitors.js for the full rationale.
+  const oneHourAgoIso = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const history = db.prepare(`
     SELECT status FROM check_history
-    WHERE monitor_id = ? AND checked_at >= datetime('now', '-1 hour')
-  `).all(monitor.id);
+    WHERE monitor_id = ? AND checked_at >= ?
+  `).all(monitor.id, oneHourAgoIso);
 
   const upCount       = history.filter(h => h.status === 'up').length;
   const uptimePercent = history.length

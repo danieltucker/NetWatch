@@ -218,7 +218,7 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
 
         // ── version ──────────────────────────────────────────────────────
         case 'version':
-          emit({ type: 'output', text: 'NetWatch v6.5.1' });
+          emit({ type: 'output', text: 'NetWatch v6.5.2' });
           break;
 
         // ── help ─────────────────────────────────────────────────────────
@@ -563,8 +563,12 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
             { type: 'divider' },
             { type: 'info', text: `${monitors.length} monitor(s) — history window debug` },
             ...monitors.slice(0, 15).map(m => {
-              const oldest = m.history?.[0]?.timestamp ? new Date(m.history[0].timestamp).toLocaleTimeString() : '?';
-              const newest = m.history?.[m.history.length - 1]?.timestamp ? new Date(m.history[m.history.length - 1].timestamp).toLocaleTimeString() : '?';
+              // Full date+time (not just time-of-day) so multi-day accumulation is visible
+              const fmt = ts => ts
+                ? new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+                : '?';
+              const oldest = fmt(m.history?.[0]?.timestamp);
+              const newest = fmt(m.history?.[m.history.length - 1]?.timestamp);
               return {
                 type: 'output',
                 text: `  ${pad(m.label, 24)}  window=${pad(m.historyWindow ?? '?', 5)}  pts=${pad(String(m.history?.length ?? 0), 4)}  ${oldest} → ${newest}`,

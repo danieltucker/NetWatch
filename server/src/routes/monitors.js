@@ -11,17 +11,27 @@ const ALLOWED_CHECK_TYPES = new Set(['http', 'tcp', 'icmp', 'api']);
 const MIN_INTERVAL_S = 30;
 
 // ── Window config ─────────────────────────────────────────────────────────────
-// lookback: SQLite datetime modifier
+// ms: lookback span in milliseconds — used to compute an ISO cutoff in JS.
 // bucketMinutes: null = return raw points; number = aggregate into N-min buckets
+//
+// NOTE: checked_at is stored as an ISO-8601 UTC string (new Date().toISOString(),
+// e.g. '2026-06-05T08:46:19.000Z'). We must NOT compare it against SQLite's
+// datetime('now', ...) which yields a space-separated form ('2026-06-05 08:46:19').
+// SQLite does a lexical TEXT comparison, and the 'T' (0x54) vs ' ' (0x20) at index
+// 10 makes every same-date row sort "greater", so the time-of-day filter is ignored
+// and all windows return the same rows. Instead we bind a JS-computed ISO cutoff so
+// the comparison is ISO-vs-ISO (lexically == chronologically for UTC).
+
+const MIN = 60 * 1000, HOUR = 60 * MIN, DAY = 24 * HOUR;
 
 const WINDOWS = {
-  '15m': { lookback: '-15 minutes', bucketMinutes: null },
-  '1h':  { lookback: '-1 hour',     bucketMinutes: null },
-  '6h':  { lookback: '-6 hours',    bucketMinutes: null },
-  '12h': { lookback: '-12 hours',   bucketMinutes: 15   },
-  '1d':  { lookback: '-1 day',      bucketMinutes: 60   },
-  '1w':  { lookback: '-7 days',     bucketMinutes: 360  },
-  '30d': { lookback: '-30 days',    bucketMinutes: 1440 },
+  '15m': { ms: 15 * MIN, bucketMinutes: null },
+  '1h':  { ms: HOUR,     bucketMinutes: null },
+  '6h':  { ms: 6 * HOUR, bucketMinutes: null },
+  '12h': { ms: 12 * HOUR, bucketMinutes: 15   },
+  '1d':  { ms: DAY,       bucketMinutes: 60   },
+  '1w':  { ms: 7 * DAY,   bucketMinutes: 360  },
+  '30d': { ms: 30 * DAY,  bucketMinutes: 1440 },
 };
 
 // ── Bucket helper (shared by preset + custom range paths) ─────────────────────
@@ -95,14 +105,15 @@ function getWindowedHistory(monitorId, window, from = null, to = null) {
     return bucketMinutes ? bucketRows(rows, bucketMinutes) : rowsToRaw(rows);
   }
 
-  const cfg  = WINDOWS[window] ?? WINDOWS['1h'];
+  const cfg       = WINDOWS[window] ?? WINDOWS['1h'];
+  const cutoffIso = new Date(Date.now() - cfg.ms).toISOString();
   const rows = db.prepare(`
     SELECT checked_at, status, total_ms, dns_ms, tcp_ms, tls_ms,
            ttfb_ms, http_status, cert_days, error
     FROM   check_history
-    WHERE  monitor_id = ? AND checked_at >= datetime('now', ?)
+    WHERE  monitor_id = ? AND checked_at >= ?
     ORDER  BY checked_at ASC
-  `).all(monitorId, cfg.lookback);
+  `).all(monitorId, cutoffIso);
 
   return cfg.bucketMinutes ? bucketRows(rows, cfg.bucketMinutes) : rowsToRaw(rows);
 }
