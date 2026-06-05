@@ -210,12 +210,12 @@ function PingMetric({ ping, trend, hovered, isDark, t, degradedThreshold }) {
 
   return (
     <div style={{ backgroundColor: tileBg, transition: 'background-color 150ms ease', padding: '12px 14px 10px' }}>
-      <div className="text-[10px] font-mono uppercase tracking-wider mb-1.5" style={{ color: t.textFaint }}>Ping</div>
-      <div className="text-xl font-mono font-bold leading-none mb-1" style={{ color: hasValue ? color : t.textFaint }}>
-        {hasValue ? `${ping}ms` : '—'}
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: t.textFaint }}>Ping</span>
+        {trend && <span className="text-[10px] font-mono opacity-75" style={{ color: trendColor }}>{trend.direction === 'faster' ? '↓' : '↑'} {trend.delta}ms</span>}
       </div>
-      <div className="h-[14px] text-[10px] font-mono opacity-75 mb-1.5" style={{ color: trendColor }}>
-        {trend ? `${trend.direction === 'faster' ? '↓' : '↑'} ${trend.delta}ms` : ''}
+      <div className="text-xl font-mono font-bold leading-none mb-2" style={{ color: hasValue ? color : t.textFaint }}>
+        {hasValue ? `${ping}ms` : '—'}
       </div>
       <div className="h-[3px] rounded-full overflow-hidden" style={{ backgroundColor: t.metricGap }}>
         <div className="h-full rounded-full transition-all duration-700"
@@ -238,12 +238,12 @@ function UptimeMetric({ uptimePercent, hasHistory, trend, hovered, isDark, t }) 
 
   return (
     <div style={{ backgroundColor: tileBg, transition: 'background-color 150ms ease', padding: '12px 14px 10px' }}>
-      <div className="text-[10px] font-mono uppercase tracking-wider mb-1.5" style={{ color: t.textFaint }}>Uptime</div>
-      <div className="text-xl font-mono font-bold leading-none mb-1" style={{ color: hasHistory ? color : t.textFaint }}>
-        {hasHistory ? `${uptimePercent}%` : '—'}
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: t.textFaint }}>Uptime</span>
+        {trend && <span className="text-[10px] font-mono opacity-75" style={{ color: trendColor }}>{trend.direction === 'up' ? '↑' : '↓'} {trend.delta}%</span>}
       </div>
-      <div className="h-[14px] text-[10px] font-mono opacity-75 mb-1.5" style={{ color: trendColor }}>
-        {trend ? `${trend.direction === 'up' ? '↑' : '↓'} ${trend.delta}%` : ''}
+      <div className="text-xl font-mono font-bold leading-none mb-2" style={{ color: hasHistory ? color : t.textFaint }}>
+        {hasHistory ? `${uptimePercent}%` : '—'}
       </div>
       <div className="h-[3px] rounded-full overflow-hidden" style={{ backgroundColor: t.metricGap }}>
         <div className="h-full rounded-full transition-all duration-700"
@@ -374,7 +374,7 @@ function MonitorCardInner({
         borderTop:       `3px solid ${statusTopBorder}`,
         opacity:         isDragging ? 0.85 : 1,
         boxShadow:       cardShadow,
-        transition:      'background-color 150ms ease, border-color 150ms ease, box-shadow 200ms ease',
+        transition:      'background-color 150ms ease, box-shadow 200ms ease',
       }}
       onClick={() => onCardClick?.(monitor)}
       onMouseEnter={() => setHovered(true)}

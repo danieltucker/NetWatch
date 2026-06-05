@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronLeft, Send, CheckCircle, AlertCircle, Loader, Bell, Settings2, SlidersHorizontal, Puzzle, ExternalLink, FileBarChart2, Plus, Wifi, Globe, Terminal, Palette, Key, Copy, RefreshCw, Trash2 } from 'lucide-react';
-import { useTheme, THEMES } from '../hooks/useTheme';
+import { X, ChevronLeft, Send, CheckCircle, AlertCircle, Loader, Bell, Settings2, SlidersHorizontal, Puzzle, ExternalLink, FileBarChart2, Plus, Wifi, Globe, Terminal, Key, Copy, RefreshCw, Trash2 } from 'lucide-react';
+import { useTheme } from '../hooks/useTheme';
 import { moduleRegistry } from '../modules/index.js';
 import { NETWORK_REF_PRESETS, DEFAULT_NETWORK_REFS_ENABLED } from '../types/networkRefs.js';
 
@@ -17,7 +17,6 @@ const DEFAULT_SETTINGS = {
 };
 
 const TABS = [
-  { id: 'appearance',    label: 'Appearance',     Icon: Palette        },
   { id: 'general',       label: 'General',        Icon: SlidersHorizontal },
   { id: 'notifications', label: 'Notifications',  Icon: Bell           },
   { id: 'reports',       label: 'Reports',        Icon: FileBarChart2  },
@@ -46,8 +45,8 @@ const CHANNEL_VALIDATION = [
 // ── SettingsPanel ─────────────────────────────────────────────────────────────
 
 export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, alertsAutoOpen = 'outage', onAlertsAutoOpenChange }) {
-  const { t, isDark, themeMode, setThemeMode, themeName, setThemeName } = useTheme();
-  const [activeTab,        setActiveTab]        = useState('appearance');
+  const { t, isDark, themeMode, setThemeMode } = useTheme();
+  const [activeTab,        setActiveTab]        = useState('general');
   const [mobileContentOpen, setMobileContentOpen] = useState(false);
   const [settings,      setSettings]      = useState(DEFAULT_SETTINGS);
   const [moduleSettings, setModuleSettings] = useState({});  // module.* keys
@@ -341,7 +340,7 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
           {/* Version label — desktop only */}
           <div className="hidden sm:block px-5 py-5">
             <div className="text-xs font-mono" style={{ color: t.textFaint }}>
-              NetWatch v6.5.0
+              NetWatch v6.5.1
             </div>
           </div>
         </aside>
@@ -386,22 +385,14 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
 
           {/* Scrollable content */}
           <div className="flex-1 overflow-y-auto px-5 sm:px-7 pb-4">
-            {activeTab === 'appearance' && (
-              <AppearanceTab
-                themeMode={themeMode}
-                setThemeMode={setThemeMode}
-                themeName={themeName}
-                setThemeName={setThemeName}
-                isDark={isDark}
-                t={t}
-              />
-            )}
             {activeTab === 'general' && (
               <GeneralTab
                 chartYMax={chartYMax}
                 onChartYMaxChange={onChartYMaxChange}
                 alertsAutoOpen={alertsAutoOpen}
                 onAlertsAutoOpenChange={onAlertsAutoOpenChange}
+                themeMode={themeMode}
+                setThemeMode={setThemeMode}
                 t={t}
                 isDark={isDark}
               />
@@ -505,9 +496,48 @@ const CHART_Y_OPTIONS = [
   { label: '750ms',  value: '750'  },
 ];
 
-function GeneralTab({ chartYMax, onChartYMaxChange, alertsAutoOpen, onAlertsAutoOpenChange, t, isDark }) {
+const THEME_OPTIONS = [
+  { value: 'light', label: 'Light' },
+  { value: 'auto',  label: 'System' },
+  { value: 'dark',  label: 'Dark'  },
+];
+
+function GeneralTab({ chartYMax, onChartYMaxChange, alertsAutoOpen, onAlertsAutoOpenChange, themeMode, setThemeMode, t, isDark }) {
   return (
     <div className="space-y-3">
+      <SettingRow
+        title="Display mode"
+        description="Choose light or dark, or follow your operating system setting."
+        t={t}
+        isDark={isDark}>
+        <div className="flex shrink-0">
+          {THEME_OPTIONS.map(({ value, label }, i) => {
+            const isActive = themeMode === value;
+            const isFirst  = i === 0;
+            const isLast   = i === THEME_OPTIONS.length - 1;
+            return (
+              <button
+                key={value}
+                onClick={() => setThemeMode(value)}
+                className="px-4 py-1.5 text-xs font-mono font-medium border transition-all"
+                style={{
+                  borderRadius:    isFirst ? '0.5rem 0 0 0.5rem' : isLast ? '0 0.5rem 0.5rem 0' : '0',
+                  marginLeft:      i > 0 ? '-1px' : 0,
+                  position:        'relative',
+                  zIndex:          isActive ? 1 : 0,
+                  backgroundColor: isActive
+                    ? isDark ? 'rgba(96,165,250,0.15)' : 'rgba(59,130,246,0.1)'
+                    : isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+                  borderColor:     isActive ? '#60a5fa' : t.cardBorder,
+                  color:           isActive ? '#60a5fa' : t.textSecondary,
+                }}>
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </SettingRow>
+
       <SettingRow
         title="Chart scale"
         description="Maximum ping value shown on all graphs. Auto adjusts to your data; a fixed value lets you compare monitors side by side on the same scale."
@@ -1369,119 +1399,7 @@ function Field({ label, invalid = false, children, t }) {
   );
 }
 
-// ── Appearance tab ────────────────────────────────────────────────────────────
-
-const THEME_OPTIONS = [
-  { value: 'light', label: 'Light' },
-  { value: 'auto',  label: 'Auto'  },
-  { value: 'dark',  label: 'Dark'  },
-];
-
-function ThemeSwatch({ name, theme, isActive, onClick }) {
-  const preview = theme.dark;
-  return (
-    <button
-      onClick={onClick}
-      className="text-left rounded-lg border-2 p-2.5 transition-all"
-      style={{
-        borderColor:     isActive ? '#60a5fa' : preview.cardBorder,
-        backgroundColor: preview.pageBg,
-        outline:         isActive ? '1px solid #60a5fa' : 'none',
-        outlineOffset:   '1px',
-      }}>
-      {/* Mini card preview */}
-      <div
-        className="rounded mb-2 overflow-hidden"
-        style={{ height: '32px', backgroundColor: preview.pageBg, padding: '4px' }}>
-        <div
-          className="rounded h-full flex items-center gap-1 px-2"
-          style={{ backgroundColor: preview.cardBg }}>
-          <div className="rounded-full shrink-0" style={{ width: '6px', height: '6px', backgroundColor: preview.textPrimary }} />
-          <div className="rounded flex-1" style={{ height: '3px', backgroundColor: preview.textSecondary }} />
-          <div className="rounded shrink-0" style={{ width: '12px', height: '3px', backgroundColor: preview.textMuted }} />
-        </div>
-      </div>
-      {/* Label */}
-      <div
-        className="text-xs font-mono"
-        style={{ color: isActive ? '#60a5fa' : preview.textSecondary }}>
-        {theme.label}
-      </div>
-    </button>
-  );
-}
-
-function AppearanceTab({ themeMode, setThemeMode, themeName, setThemeName, isDark, t }) {
-  return (
-    <div className="space-y-5">
-      {/* Theme picker */}
-      <div>
-        <div className="text-xs font-mono font-medium mb-1" style={{ color: t.textPrimary }}>Color theme</div>
-        <div className="text-xs font-mono mb-3" style={{ color: t.textMuted }}>
-          Each theme has a dark and light variant — the mode selector below determines which is shown.
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {Object.entries(THEMES).map(([name, theme]) => (
-            <ThemeSwatch
-              key={name}
-              name={name}
-              theme={theme}
-              isActive={themeName === name}
-              onClick={() => setThemeName(name)}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Divider */}
-      <div className="h-px" style={{ backgroundColor: t.cardBorder }} />
-
-      {/* Mode selector */}
-      <SettingRow
-        title="Mode"
-        description="Choose light or dark, or let NetWatch follow your operating system setting."
-        t={t}
-        isDark={isDark}>
-        <div className="flex shrink-0">
-          {THEME_OPTIONS.map(({ value, label }, i) => {
-            const isActive = themeMode === value;
-            const isFirst  = i === 0;
-            const isLast   = i === THEME_OPTIONS.length - 1;
-            return (
-              <button
-                key={value}
-                onClick={() => setThemeMode(value)}
-                className="px-4 py-1.5 text-xs font-mono font-medium border transition-all"
-                style={{
-                  borderRadius:    isFirst ? '0.5rem 0 0 0.5rem' : isLast ? '0 0.5rem 0.5rem 0' : '0',
-                  marginLeft:      i > 0 ? '-1px' : 0,
-                  position:        'relative',
-                  zIndex:          isActive ? 1 : 0,
-                  backgroundColor: isActive
-                    ? isDark ? 'rgba(96,165,250,0.15)' : 'rgba(59,130,246,0.1)'
-                    : isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                  borderColor:     isActive ? '#60a5fa' : t.cardBorder,
-                  color:           isActive ? '#60a5fa' : t.textSecondary,
-                }}>
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      </SettingRow>
-
-      {themeMode === 'auto' && (
-        <div
-          className="px-4 py-2.5 rounded-lg text-xs font-mono"
-          style={{ color: t.textMuted, backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)' }}>
-          Currently showing{' '}
-          <span style={{ color: t.textSecondary }}>{isDark ? 'dark' : 'light'}</span>
-          {' '}mode based on your OS setting.
-        </div>
-      )}
-    </div>
-  );
-}
+// ── Appearance tab removed — light/dark moved to General tab ──────────────────
 
 // ── Network tab ───────────────────────────────────────────────────────────────
 

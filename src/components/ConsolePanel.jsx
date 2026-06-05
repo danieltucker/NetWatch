@@ -24,6 +24,7 @@ const CMDS = {
   ssl:       { usage: 'ssl <name>',          desc: 'Show SSL certificate status for a monitor' },
   open:      { usage: 'open <name>',         desc: 'Open monitor target URL in browser' },
   tags:      { usage: 'tags',                desc: 'List all tags and which monitors use each' },
+  debug:     { usage: 'debug',               desc: 'Show history window and point counts for all monitors' },
   version:   { usage: 'version',             desc: 'Show NetWatch version' },
 };
 
@@ -217,7 +218,7 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
 
         // ── version ──────────────────────────────────────────────────────
         case 'version':
-          emit({ type: 'output', text: 'NetWatch v6.5.0' });
+          emit({ type: 'output', text: 'NetWatch v6.5.1' });
           break;
 
         // ── help ─────────────────────────────────────────────────────────
@@ -555,6 +556,25 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
           break;
         }
 
+        // ── debug ────────────────────────────────────────────────────────
+        case 'debug': {
+          if (!monitors.length) { emit({ type: 'warn', text: 'No monitors loaded' }); break; }
+          emit([
+            { type: 'divider' },
+            { type: 'info', text: `${monitors.length} monitor(s) — history window debug` },
+            ...monitors.slice(0, 15).map(m => {
+              const oldest = m.history?.[0]?.timestamp ? new Date(m.history[0].timestamp).toLocaleTimeString() : '?';
+              const newest = m.history?.[m.history.length - 1]?.timestamp ? new Date(m.history[m.history.length - 1].timestamp).toLocaleTimeString() : '?';
+              return {
+                type: 'output',
+                text: `  ${pad(m.label, 24)}  window=${pad(m.historyWindow ?? '?', 5)}  pts=${pad(String(m.history?.length ?? 0), 4)}  ${oldest} → ${newest}`,
+              };
+            }),
+            { type: 'divider' },
+          ]);
+          break;
+        }
+
         // ── unknown ───────────────────────────────────────────────────────
         default:
           emit({ type: 'error', text: `Unknown command: ${cmd}  (type "help" to list commands)` });
@@ -579,7 +599,7 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
       fontSize:          13,
       backgroundColor: '#0a0c0f',
       borderBottom:    '1px solid #21262d',
-      boxShadow:       '0 8px 40px rgba(0,0,0,0.7)',
+      boxShadow:       isOpen ? '0 8px 40px rgba(0,0,0,0.7)' : 'none',
       transform:        isOpen ? 'translateY(0)' : 'translateY(-100%)',
       transition:       'transform 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
       pointerEvents:    isOpen ? 'all' : 'none',

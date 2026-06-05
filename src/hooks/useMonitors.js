@@ -31,12 +31,20 @@ export function useMonitors(historyWindow = '1h', historyRange = null) {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(`/api/monitors?${buildParams(historyRange, historyWindow)}`)
+    const url = `/api/monitors?${buildParams(historyRange, historyWindow)}`;
+    console.debug('[useMonitors] fetch start — window=%s url=%s', historyWindow, url);
+    fetch(url)
       .then(r => {
         if (!r.ok) throw new Error(`Server returned ${r.status}`);
         return r.json();
       })
-      .then(data => { setMonitors(data); setLoading(false); })
+      .then(data => {
+        const first = data[0];
+        console.debug('[useMonitors] fetch done — %d monitors, first={ label:%s, historyWindow:%s, historyLen:%d }',
+          data.length, first?.label, first?.historyWindow, first?.history?.length ?? 0);
+        setMonitors(data);
+        setLoading(false);
+      })
       .catch(err  => { setError(err.message); setLoading(false); });
   }, [historyWindow, historyRange]);
 
@@ -73,6 +81,7 @@ export function useMonitors(historyWindow = '1h', historyRange = null) {
           const cutoff  = Date.now() - WINDOW_MS[m.historyWindow];
           const history = [...m.history, u.newPoint]
             .filter(h => h.timestamp && new Date(h.timestamp).getTime() >= cutoff);
+          console.debug('[useMonitors:SSE] checked — label=%s window=%s pts=%d', m.label, m.historyWindow, history.length);
           return { ...base, history };
         }
 

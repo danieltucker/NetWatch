@@ -335,7 +335,7 @@ export default function App() {
             </span>
             <span className="hidden sm:inline text-xs font-mono px-2 py-0.5 rounded border"
               style={{ color: t.textFaint, borderColor: t.cardBorder }}>
-              netwatch · v6.5.0
+              netwatch · v6.5.1
             </span>
           </div>
 
