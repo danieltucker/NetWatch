@@ -22,6 +22,14 @@ const SEG_WINDOWS = [
   { label: '30D', value: '30d' },
 ];
 
+// Timing segment colors — match TimingRow.jsx VIZ palette
+const VIZ = {
+  dns:  'var(--wt-viz-1)',
+  tcp:  'var(--wt-viz-2)',
+  tls:  'var(--wt-viz-4)',
+  ttfb: 'var(--wt-viz-6)',
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -104,10 +112,10 @@ function ModalTooltip({ active, payload, t }) {
       })
     : '';
   return (
-    <div className="rounded-lg text-xs font-mono shadow-xl border px-3 py-2"
+    <div className="rounded-lg text-xs wt-mono shadow-xl border px-3 py-2"
       style={{ backgroundColor: t.tooltipBg, borderColor: t.tooltipBorder, minWidth: 110 }}>
       {d.status === 'down'
-        ? <div className="text-red-400 font-bold mb-1">DOWN</div>
+        ? <div className="font-bold mb-1" style={{ color: 'var(--wt-down-500)' }}>DOWN</div>
         : <div className="font-bold mb-1" style={{ color: t.textPrimary }}>{d.ping != null ? `${d.ping}ms` : '—'}</div>}
       <div style={{ color: t.textFaint }}>{timeLabel}</div>
     </div>
@@ -123,7 +131,7 @@ function HistoryTab({ history, t, isDark }) {
 
   if (history.length === 0) {
     return (
-      <div className="flex items-center justify-center py-16 text-xs font-mono" style={{ color: t.textFaint }}>
+      <div className="flex items-center justify-center py-16 text-xs wt-mono" style={{ color: t.textFaint }}>
         No history yet — awaiting first check
       </div>
     );
@@ -131,7 +139,7 @@ function HistoryTab({ history, t, isDark }) {
 
   const reversed = [...history].reverse();
   return (
-    <table className="w-full text-xs font-mono">
+    <table className="w-full text-xs wt-mono">
       <thead className="sticky top-0" style={{ backgroundColor: t.cardBg }}>
         <tr className="border-b" style={{ borderColor: t.metricGap }}>
           <th className="px-4 py-2 text-left font-semibold" style={{ color: t.textFaint }}>Time</th>
@@ -143,7 +151,7 @@ function HistoryTab({ history, t, isDark }) {
       <tbody>
         {reversed.map((entry, i) => {
           const isExpanded  = expandedIdx === i;
-          const statusColor = entry.status === 'down' ? '#f87171' : entry.status === 'up' ? '#4ade80' : t.textSecondary;
+          const statusColor = entry.status === 'down' ? 'var(--wt-down-500)' : entry.status === 'up' ? 'var(--wt-up-500)' : t.textSecondary;
           const hasTimings  = entry.dnsMs != null;
           const hasDetail   = hasTimings || entry.httpStatus != null || !!entry.error || (entry.aggregated && entry.uptimePct != null);
 
@@ -151,9 +159,9 @@ function HistoryTab({ history, t, isDark }) {
           if (entry.aggregated && entry.uptimePct != null) {
             info = <span style={{ color: t.textFaint }}>{entry.uptimePct}% up</span>;
           } else if (entry.httpStatus != null) {
-            info = <span className={entry.httpStatus >= 400 ? 'text-red-400' : ''} style={entry.httpStatus < 400 ? { color: t.textFaint } : {}}>HTTP {entry.httpStatus}</span>;
+            info = <span style={{ color: entry.httpStatus >= 400 ? 'var(--wt-down-500)' : t.textFaint }}>HTTP {entry.httpStatus}</span>;
           } else if (entry.error) {
-            info = <span className="text-red-400/80 truncate block max-w-[140px]" title={entry.error}>{entry.error}</span>;
+            info = <span className="truncate block max-w-[140px]" style={{ color: 'var(--wt-down-500)', opacity: 0.8 }} title={entry.error}>{entry.error}</span>;
           }
 
           return (
@@ -161,7 +169,7 @@ function HistoryTab({ history, t, isDark }) {
               <tr className="border-b cursor-pointer hover:opacity-80 transition-opacity" style={{ borderColor: t.metricGap }}
                 onClick={() => setExpandedIdx(isExpanded ? null : i)}>
                 <td className="py-2 pl-2 pr-4 border-l-2 transition-colors"
-                  style={{ color: t.textFaint, borderLeftColor: isExpanded ? '#60a5fa' : 'transparent' }}>
+                  style={{ color: t.textFaint, borderLeftColor: isExpanded ? 'var(--wt-brand-400)' : 'transparent' }}>
                   {entry.timestamp ? formatTimestamp(entry.timestamp) : '—'}
                 </td>
                 <td className="px-4 py-2">
@@ -177,32 +185,32 @@ function HistoryTab({ history, t, isDark }) {
               {isExpanded && (
                 <tr className="border-b" style={{ borderColor: t.metricGap }}>
                   <td colSpan={4} className="px-5 py-3 border-l-2"
-                    style={{ borderLeftColor: '#60a5fa', backgroundColor: isDark ? 'rgba(96,165,250,0.05)' : 'rgba(59,130,246,0.03)', borderTopColor: t.metricGap }}>
+                    style={{ borderLeftColor: 'var(--wt-brand-400)', backgroundColor: 'color-mix(in oklch, var(--wt-brand-500) 5%, transparent)', borderTopColor: t.metricGap }}>
                     {hasDetail ? (
                       <div className="space-y-2">
                         {hasTimings && (
                           <div className="flex items-center gap-3 flex-wrap">
-                            <TimingChip label="DNS"  value={entry.dnsMs}  color="#3b82f6" t={t} />
-                            <TimingChip label="TCP"  value={entry.tcpMs}  color="#22c55e" t={t} />
-                            {entry.tlsMs != null && <TimingChip label="TLS" value={entry.tlsMs} color="#f59e0b" t={t} />}
-                            <TimingChip label="TTFB" value={entry.ttfbMs} color="#a78bfa" t={t} />
+                            <TimingChip label="DNS"  value={entry.dnsMs}  color={VIZ.dns}  t={t} />
+                            <TimingChip label="TCP"  value={entry.tcpMs}  color={VIZ.tcp}  t={t} />
+                            {entry.tlsMs != null && <TimingChip label="TLS" value={entry.tlsMs} color={VIZ.tls} t={t} />}
+                            <TimingChip label="TTFB" value={entry.ttfbMs} color={VIZ.ttfb} t={t} />
                             {entry.httpStatus != null && (
-                              <span className="ml-2 text-xs font-mono" style={{ color: entry.httpStatus >= 400 ? '#f87171' : t.textMuted }}>HTTP {entry.httpStatus}</span>
+                              <span className="ml-2 text-xs wt-mono" style={{ color: entry.httpStatus >= 400 ? 'var(--wt-down-500)' : t.textMuted }}>HTTP {entry.httpStatus}</span>
                             )}
                           </div>
                         )}
                         {!hasTimings && entry.httpStatus != null && (
-                          <div className="text-xs font-mono" style={{ color: entry.httpStatus >= 400 ? '#f87171' : t.textMuted }}>HTTP {entry.httpStatus}</div>
+                          <div className="text-xs wt-mono" style={{ color: entry.httpStatus >= 400 ? 'var(--wt-down-500)' : t.textMuted }}>HTTP {entry.httpStatus}</div>
                         )}
-                        {entry.error && <div className="text-xs font-mono leading-relaxed" style={{ color: '#f87171' }}>{entry.error}</div>}
+                        {entry.error && <div className="text-xs wt-mono leading-relaxed" style={{ color: 'var(--wt-down-500)' }}>{entry.error}</div>}
                         {entry.aggregated && entry.uptimePct != null && (
-                          <div className="text-xs font-mono" style={{ color: t.textSecondary }}>
-                            Uptime: <span style={{ color: entry.uptimePct >= 99 ? '#4ade80' : entry.uptimePct >= 95 ? '#fbbf24' : '#f87171' }}>{entry.uptimePct}%</span>
+                          <div className="text-xs wt-mono" style={{ color: t.textSecondary }}>
+                            Uptime: <span style={{ color: entry.uptimePct >= 99 ? 'var(--wt-up-500)' : entry.uptimePct >= 95 ? 'var(--wt-warn-500)' : 'var(--wt-down-500)' }}>{entry.uptimePct}%</span>
                           </div>
                         )}
                       </div>
                     ) : (
-                      <span className="text-xs font-mono" style={{ color: t.textFaint }}>No additional detail available</span>
+                      <span className="text-xs wt-mono" style={{ color: t.textFaint }}>No additional detail available</span>
                     )}
                   </td>
                 </tr>
@@ -236,13 +244,13 @@ function IncidentsTab({ history, t, isDark, initialIncidentTimestamp }) {
   }, [initialIncidentTimestamp, incidents]);
 
   if (history.length === 0) {
-    return <div className="flex items-center justify-center py-16 text-xs font-mono" style={{ color: t.textFaint }}>No history yet — awaiting first check</div>;
+    return <div className="flex items-center justify-center py-16 text-xs wt-mono" style={{ color: t.textFaint }}>No history yet — awaiting first check</div>;
   }
   if (incidents.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-2">
-        <span className="text-lg" style={{ color: '#4ade80' }}>✓</span>
-        <span className="text-xs font-mono" style={{ color: '#4ade80' }}>All checks passed in this window</span>
+        <span className="text-lg" style={{ color: 'var(--wt-up-500)' }}>✓</span>
+        <span className="text-xs wt-mono" style={{ color: 'var(--wt-up-600)' }}>All checks passed in this window</span>
       </div>
     );
   }
@@ -253,38 +261,38 @@ function IncidentsTab({ history, t, isDark, initialIncidentTimestamp }) {
         return (
           <div key={i}>
             <div className="flex items-start gap-3 px-5 py-3.5 border-l-2 cursor-pointer hover:opacity-80 transition-opacity"
-              style={{ borderLeftColor: isExpanded ? '#ef4444' : 'rgba(239,68,68,0.5)' }}
+              style={{ borderLeftColor: isExpanded ? 'var(--wt-down-500)' : 'color-mix(in oklch, var(--wt-down-500) 50%, transparent)' }}
               onClick={() => setExpandedIdx(isExpanded ? null : i)}>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-xs font-mono font-semibold" style={{ color: '#f87171' }}>↓ Down</span>
+                  <span className="text-xs wt-mono font-semibold" style={{ color: 'var(--wt-down-500)' }}>↓ Down</span>
                   {inc.ongoing && (
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(239,68,68,0.12)', color: '#f87171' }}>ongoing</span>
+                    <span className="text-[10px] wt-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: 'color-mix(in oklch, var(--wt-down-500) 12%, transparent)', color: 'var(--wt-down-500)' }}>ongoing</span>
                   )}
                 </div>
-                <div className="text-xs font-mono" style={{ color: t.textSecondary }}>
+                <div className="text-xs wt-mono" style={{ color: t.textSecondary }}>
                   {inc.start ? formatTimestamp(inc.start) : '—'}
                   {inc.end && <span style={{ color: t.textFaint }}>{' — '}{formatTimestamp(inc.end)}</span>}
                 </div>
                 {inc.error && !isExpanded && (
-                  <div className="mt-1 text-[10px] font-mono truncate" style={{ color: 'rgba(248,113,113,0.7)' }} title={inc.error}>{inc.error}</div>
+                  <div className="mt-1 text-[10px] wt-mono truncate" style={{ color: 'color-mix(in oklch, var(--wt-down-500) 70%, transparent)' }} title={inc.error}>{inc.error}</div>
                 )}
               </div>
               <div className="shrink-0 text-right">
                 {inc.durationMin != null
-                  ? <span className="text-xs font-mono" style={{ color: t.textMuted }}>{inc.durationMin < 1 ? '< 1 min' : `${inc.durationMin} min`}</span>
-                  : <span className="text-xs font-mono" style={{ color: t.textFaint }}>—</span>}
+                  ? <span className="text-xs wt-mono" style={{ color: t.textMuted }}>{inc.durationMin < 1 ? '< 1 min' : `${inc.durationMin} min`}</span>
+                  : <span className="text-xs wt-mono" style={{ color: t.textFaint }}>—</span>}
               </div>
             </div>
             {isExpanded && (
               <div className="px-5 py-3 border-l-2 border-t"
-                style={{ borderLeftColor: '#ef4444', borderTopColor: t.metricGap, backgroundColor: isDark ? 'rgba(239,68,68,0.06)' : 'rgba(239,68,68,0.03)' }}>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs font-mono">
+                style={{ borderLeftColor: 'var(--wt-down-500)', borderTopColor: t.metricGap, backgroundColor: 'color-mix(in oklch, var(--wt-down-500) 5%, transparent)' }}>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs wt-mono">
                   <div><span style={{ color: t.textFaint }}>Started</span><div style={{ color: t.textSecondary }}>{inc.start ? new Date(inc.start).toLocaleString() : '—'}</div></div>
-                  <div><span style={{ color: t.textFaint }}>Resolved</span><div style={{ color: t.textSecondary }}>{inc.ongoing ? <span style={{ color: '#f87171' }}>Ongoing</span> : inc.end ? new Date(inc.end).toLocaleString() : '—'}</div></div>
-                  <div><span style={{ color: t.textFaint }}>Duration</span><div style={{ color: t.textSecondary }}>{inc.ongoing ? <span style={{ color: '#f87171' }}>Ongoing</span> : inc.durationMin != null ? `${inc.durationMin} minute${inc.durationMin !== 1 ? 's' : ''}` : '—'}</div></div>
+                  <div><span style={{ color: t.textFaint }}>Resolved</span><div style={{ color: t.textSecondary }}>{inc.ongoing ? <span style={{ color: 'var(--wt-down-500)' }}>Ongoing</span> : inc.end ? new Date(inc.end).toLocaleString() : '—'}</div></div>
+                  <div><span style={{ color: t.textFaint }}>Duration</span><div style={{ color: t.textSecondary }}>{inc.ongoing ? <span style={{ color: 'var(--wt-down-500)' }}>Ongoing</span> : inc.durationMin != null ? `${inc.durationMin} minute${inc.durationMin !== 1 ? 's' : ''}` : '—'}</div></div>
                 </div>
-                {inc.error && <div className="mt-2.5 text-xs font-mono leading-relaxed" style={{ color: '#f87171' }}>{inc.error}</div>}
+                {inc.error && <div className="mt-2.5 text-xs wt-mono leading-relaxed" style={{ color: 'var(--wt-down-500)' }}>{inc.error}</div>}
               </div>
             )}
           </div>
@@ -311,27 +319,23 @@ function EmbedTab({ monitor, t }) {
 
   return (
     <div className="px-6 py-5 space-y-4">
-      <div className="flex gap-2">
+      <div className="wt-seg">
         {[{ id: 'widget', Icon: Monitor, label: 'This Monitor' }, { id: 'page', Icon: LayoutGrid, label: 'Full Dashboard' }].map(({ id, Icon, label }) => (
-          <button key={id} onClick={() => setEmbedType(id)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono rounded border transition-colors"
-            style={embedType === id
-              ? { backgroundColor: 'rgba(59,130,246,0.15)', borderColor: 'rgba(59,130,246,0.5)', color: '#93c5fd' }
-              : { backgroundColor: t.tagBg, borderColor: t.tagBorder, color: t.textMuted }}>
-            <Icon size={11} />{label}
+          <button key={id} onClick={() => setEmbedType(id)} aria-selected={embedType === id}>
+            <Icon size={11} style={{ display: 'inline', marginRight: 4 }} />{label}
           </button>
         ))}
       </div>
-      <p className="text-xs font-mono" style={{ color: t.textMuted }}>
+      <p className="text-xs wt-mono" style={{ color: t.textMuted }}>
         {embedType === 'widget' ? `Embeds just the ${monitor.label} card. No edit or delete controls.` : 'Embeds the full read-only dashboard. No edit, delete, or settings controls.'}
       </p>
-      <div className="rounded border px-3 py-2 text-xs font-mono truncate" style={{ backgroundColor: t.inputBg, borderColor: t.cardBorder, color: t.textFaint }}>
+      <div className="rounded border px-3 py-2 text-xs wt-mono truncate" style={{ backgroundColor: t.inputBg, borderColor: t.cardBorder, color: t.textFaint }}>
         {embedType === 'widget' ? widgetSrc : pageSrc}
       </div>
       <div className="relative">
-        <pre className="rounded border px-4 py-3 text-xs font-mono overflow-x-auto leading-relaxed" style={{ backgroundColor: t.inputBg, borderColor: t.cardBorder, color: t.textSecondary }}>{activeCode}</pre>
-        <button onClick={copy} className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded text-xs font-mono border transition-colors"
-          style={{ backgroundColor: t.tagBg, borderColor: t.tagBorder, color: copied ? '#4ade80' : t.textMuted }}>
+        <pre className="wt-console rounded border px-4 py-3 text-xs wt-mono overflow-x-auto leading-relaxed">{activeCode}</pre>
+        <button onClick={copy} className="wt-btn wt-btn--ghost wt-btn--sm absolute top-2 right-2"
+          style={copied ? { color: 'var(--wt-up-600)' } : undefined}>
           {copied ? <><Check size={10} /> Copied</> : <><Copy size={10} /> Copy</>}
         </button>
       </div>
@@ -407,9 +411,16 @@ export function MonitorDetailModal({
   const displayStatus = monitor.status === 'up' && monitor.degradedThreshold != null &&
     monitor.currentPing != null && monitor.currentPing > monitor.degradedThreshold ? 'degraded' : monitor.status;
 
-  const lineColor   = displayStatus === 'down' ? '#ef4444' : displayStatus === 'degraded' ? '#f59e0b' : '#22c55e';
-  const statusColor = displayStatus === 'down' ? '#ef4444' : displayStatus === 'degraded' ? '#f59e0b' : displayStatus === 'up' ? '#22c55e' : '#6b7280';
-  const statusBg    = displayStatus === 'down' ? 'rgba(239,68,68,0.2)' : displayStatus === 'degraded' ? 'rgba(245,158,11,0.2)' : displayStatus === 'up' ? 'rgba(34,197,94,0.2)' : 'rgba(107,114,128,0.2)';
+  const lineColor   = displayStatus === 'down' ? 'var(--wt-down-500)' : displayStatus === 'degraded' ? 'var(--wt-warn-500)' : 'var(--wt-up-500)';
+  const statusColor = displayStatus === 'down' ? 'var(--wt-down-500)' : displayStatus === 'degraded' ? 'var(--wt-warn-500)' : displayStatus === 'up' ? 'var(--wt-up-500)' : 'var(--wt-n-500)';
+  const statusBg    = displayStatus === 'down'
+    ? 'color-mix(in oklch, var(--wt-down-500) 20%, transparent)'
+    : displayStatus === 'degraded'
+    ? 'color-mix(in oklch, var(--wt-warn-500) 20%, transparent)'
+    : displayStatus === 'up'
+    ? 'color-mix(in oklch, var(--wt-up-500) 20%, transparent)'
+    : 'color-mix(in oklch, var(--wt-n-500) 20%, transparent)';
+
   const gradientId = `modal-${monitor.id}`;
   const isHttpLike = monitor.checkType === 'http' || monitor.checkType === 'api';
   const targetHref = monitor.target?.startsWith('http') ? monitor.target : `https://${monitor.target}`;
@@ -431,8 +442,8 @@ export function MonitorDetailModal({
   };
 
   const uptimeColor = stats.uptimePct == null ? t.textFaint
-    : stats.uptimePct >= 99 ? '#4ade80'
-    : stats.uptimePct >= 95 ? '#fbbf24' : '#f87171';
+    : stats.uptimePct >= 99 ? 'var(--wt-up-500)'
+    : stats.uptimePct >= 95 ? 'var(--wt-warn-500)' : 'var(--wt-down-500)';
 
   const uptimePctDisplay = stats.uptimePct != null ? `${stats.uptimePct}%` : '—';
   const avgDisplay       = stats.avgPing != null ? `${stats.avgPing}ms` : '—';
@@ -450,17 +461,17 @@ export function MonitorDetailModal({
         {/* Left: back + identity */}
         <div className="flex items-center gap-3 min-w-0">
           <button onClick={handleClose}
-            className="flex items-center gap-1 text-xs font-mono shrink-0 transition-opacity opacity-60 hover:opacity-100"
+            className="flex items-center gap-1 text-xs wt-mono shrink-0 transition-opacity opacity-60 hover:opacity-100"
             style={{ color: t.textSecondary }}>
             <ChevronLeft size={14} />
             Dashboard
           </button>
           <span style={{ color: t.metricGap }}>|</span>
           <StatusPill status={displayStatus} />
-          <span className="text-sm font-mono font-bold truncate" style={{ color: t.textPrimary }}>
+          <span className="text-sm wt-mono font-bold truncate" style={{ color: t.textPrimary }}>
             {monitor.label}
           </span>
-          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border shrink-0"
+          <span className="text-[10px] wt-mono px-1.5 py-0.5 rounded border shrink-0"
             style={{ color: t.textFaint, borderColor: t.cardBorder }}>
             {CHECK_TYPE_LABELS[monitor.checkType] ?? (monitor.checkType ?? 'HTTP').toUpperCase()}
           </span>
@@ -497,7 +508,7 @@ export function MonitorDetailModal({
             {/* Name + link */}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-xl font-mono font-bold truncate" style={{ color: t.textPrimary }}>
+                <span className="text-xl wt-mono font-bold truncate" style={{ color: t.textPrimary }}>
                   {monitor.label}
                 </span>
                 {isHttpLike && (
@@ -510,10 +521,10 @@ export function MonitorDetailModal({
                 )}
               </div>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-xs font-mono truncate" style={{ color: t.textMuted }}>
+                <span className="text-xs wt-mono truncate" style={{ color: t.textMuted }}>
                   {monitor.target}{monitor.port ? `:${monitor.port}` : ''}
                 </span>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border shrink-0"
+                <span className="text-[10px] wt-mono px-1.5 py-0.5 rounded border shrink-0"
                   style={{ color: t.textFaint, borderColor: t.cardBorder }}>
                   {CHECK_TYPE_LABELS[monitor.checkType] ?? (monitor.checkType ?? 'HTTP').toUpperCase()}
                 </span>
@@ -524,22 +535,22 @@ export function MonitorDetailModal({
 
         {/* ── Current status strip ── */}
         <div className="px-8 py-3 border-b flex items-center gap-3 flex-wrap" style={{ borderColor: t.metricGap }}>
-          <span className="text-xs font-mono font-bold" style={{ color: statusColor }}>
+          <span className="text-xs wt-mono font-bold" style={{ color: statusColor }}>
             {(displayStatus ?? 'pending').toUpperCase()}
           </span>
           <span style={{ color: t.textFaint }}>·</span>
-          <span className="text-xs font-mono" style={{ color: t.textMuted }}>
+          <span className="text-xs wt-mono" style={{ color: t.textMuted }}>
             {monitor.lastChecked ? `checked ${formatTimestamp(monitor.lastChecked)}` : 'not yet checked'}
           </span>
           <span style={{ color: t.textFaint }}>·</span>
-          <span className="text-xs font-mono" style={{ color: t.textMuted }}>
+          <span className="text-xs wt-mono" style={{ color: t.textMuted }}>
             every {formatInterval(monitor.interval)}
           </span>
           {monitor.latest?.certDays != null && (
             <>
               <span style={{ color: t.textFaint }}>·</span>
-              <span className="text-xs font-mono" style={{
-                color: monitor.latest.certDays > 30 ? '#4ade80' : monitor.latest.certDays > 7 ? '#fbbf24' : '#f87171'
+              <span className="text-xs wt-mono" style={{
+                color: monitor.latest.certDays > 30 ? 'var(--wt-up-500)' : monitor.latest.certDays > 7 ? 'var(--wt-warn-500)' : 'var(--wt-down-500)'
               }}>
                 🔒 {monitor.latest.certDays}d
               </span>
@@ -553,13 +564,13 @@ export function MonitorDetailModal({
             { label: 'Uptime', value: uptimePctDisplay, color: uptimeColor, sub: trend.uptime ? `${trend.uptime.direction === 'up' ? '↑' : '↓'} ${trend.uptime.delta}% trend` : null },
             { label: 'Avg Response', value: avgDisplay, color: t.textSecondary, sub: trend.ping ? `${trend.ping.direction === 'faster' ? '↓' : '↑'} ${trend.ping.delta}ms ${trend.ping.direction}` : null },
             { label: historyWindow === '1h' ? 'P95' : 'Best', value: p95Display, color: t.textSecondary, sub: historyWindow === '1h' ? '95th percentile' : 'best in window' },
-            { label: 'Incidents', value: String(stats.incidents), color: stats.incidents > 0 ? '#f87171' : t.textFaint, sub: 'this window' },
+            { label: 'Incidents', value: String(stats.incidents), color: stats.incidents > 0 ? 'var(--wt-down-500)' : t.textFaint, sub: 'this window' },
           ].map(({ label, value, color, sub }) => (
             <div key={label} className="rounded-lg border px-4 py-3 flex flex-col gap-1"
-              style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', borderColor: t.metricGap }}>
-              <div className="text-[10px] font-mono uppercase tracking-wider" style={{ color: t.textFaint }}>{label}</div>
-              <div className="text-2xl font-mono font-bold" style={{ color }}>{value}</div>
-              {sub && <div className="text-[10px] font-mono" style={{ color: t.textFaint }}>{sub}</div>}
+              style={{ backgroundColor: 'var(--wt-surface-2)', borderColor: t.metricGap }}>
+              <div className="text-[10px] wt-mono uppercase tracking-wider" style={{ color: t.textFaint }}>{label}</div>
+              <div className="text-2xl wt-mono font-bold" style={{ color }}>{value}</div>
+              {sub && <div className="text-[10px] wt-mono" style={{ color: t.textFaint }}>{sub}</div>}
             </div>
           ))}
         </div>
@@ -572,19 +583,19 @@ export function MonitorDetailModal({
             { key: '30d', label: 'Last 30 Days' },
           ].map(({ key, label }) => {
             const ps = periodStats?.[key];
-            const pColor = ps == null ? t.textFaint : ps.uptimePct >= 99 ? '#4ade80' : ps.uptimePct >= 95 ? '#fbbf24' : '#f87171';
+            const pColor = ps == null ? t.textFaint : ps.uptimePct >= 99 ? 'var(--wt-up-500)' : ps.uptimePct >= 95 ? 'var(--wt-warn-500)' : 'var(--wt-down-500)';
             return (
               <div key={key} className="rounded-lg border px-4 py-3 flex flex-col gap-1"
-                style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', borderColor: t.metricGap }}>
-                <div className="text-[10px] font-mono uppercase tracking-wider" style={{ color: t.textFaint }}>{label}</div>
+                style={{ backgroundColor: 'var(--wt-surface-2)', borderColor: t.metricGap }}>
+                <div className="text-[10px] wt-mono uppercase tracking-wider" style={{ color: t.textFaint }}>{label}</div>
                 {ps == null ? (
                   <div className="h-6 rounded animate-pulse" style={{ backgroundColor: t.metricGap }} />
                 ) : (
                   <>
-                    <div className="text-lg font-mono font-bold" style={{ color: pColor }}>
+                    <div className="text-lg wt-mono font-bold" style={{ color: pColor }}>
                       {ps.uptimePct != null ? `${ps.uptimePct}%` : '—'}
                     </div>
-                    <div className="text-[10px] font-mono" style={{ color: ps.incidents > 0 ? '#f87171' : t.textFaint }}>
+                    <div className="text-[10px] wt-mono" style={{ color: ps.incidents > 0 ? 'var(--wt-down-500)' : t.textFaint }}>
                       {ps.incidents} incident{ps.incidents !== 1 ? 's' : ''}
                     </div>
                   </>
@@ -597,10 +608,10 @@ export function MonitorDetailModal({
         {/* ── Response time chart ── */}
         <div className="px-8 pt-5 pb-3 border-b" style={{ borderColor: t.metricGap }}>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-mono font-semibold" style={{ color: t.textSecondary }}>Response Time</span>
+            <span className="text-sm wt-mono font-semibold" style={{ color: t.textSecondary }}>Response Time</span>
             {trend.ping && (
-              <span className="text-[10px] font-mono opacity-75"
-                style={{ color: trend.ping.direction === 'faster' ? '#4ade80' : '#f87171' }}>
+              <span className="text-[10px] wt-mono opacity-75"
+                style={{ color: trend.ping.direction === 'faster' ? 'var(--wt-up-500)' : 'var(--wt-down-500)' }}>
                 {trend.ping.direction === 'faster' ? '↓' : '↑'} {trend.ping.delta}ms {trend.ping.direction}
               </span>
             )}
@@ -608,8 +619,8 @@ export function MonitorDetailModal({
           <div className="relative">
             {windowLoading && (
               <div className="absolute inset-0 flex items-center justify-center z-10 rounded"
-                style={{ backgroundColor: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.6)' }}>
-                <span className="text-xs font-mono" style={{ color: t.textFaint }}>Loading…</span>
+                style={{ backgroundColor: 'color-mix(in oklch, var(--wt-bg) 70%, transparent)' }}>
+                <span className="text-xs wt-mono" style={{ color: t.textFaint }}>Loading…</span>
               </div>
             )}
             {chartData.length > 0 ? (
@@ -631,18 +642,18 @@ export function MonitorDetailModal({
                       dot={(props) => {
                         const { cx, cy, payload } = props;
                         if (!cx || !cy || payload?.status !== 'down') return <circle r={0} key={props.index} />;
-                        return <circle key={props.index} cx={cx} cy={cy} r={3} fill="#ef4444" style={{ pointerEvents: 'none' }} />;
+                        return <circle key={props.index} cx={cx} cy={cy} r={3} fill="var(--wt-down-500)" style={{ pointerEvents: 'none' }} />;
                       }}
                       activeDot={{ r: 3, fill: lineColor, strokeWidth: 0 }} isAnimationActive={false} />
                     {monitor.degradedThreshold != null && isHttpLike && (
-                      <ReferenceLine y={monitor.degradedThreshold} stroke="#f59e0b" strokeDasharray="4 3" strokeWidth={1} />
+                      <ReferenceLine y={monitor.degradedThreshold} stroke="var(--wt-warn-500)" strokeDasharray="4 3" strokeWidth={1} />
                     )}
                     <Tooltip content={tooltipContent} cursor={{ stroke: t.cardBorder, strokeWidth: 1 }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="flex items-center justify-center h-24 text-xs font-mono" style={{ color: t.textFaint }}>
+              <div className="flex items-center justify-center h-24 text-xs wt-mono" style={{ color: t.textFaint }}>
                 awaiting first check…
               </div>
             )}
@@ -652,8 +663,8 @@ export function MonitorDetailModal({
         {/* ── Status history blocks ── */}
         <div className="px-8 py-4 border-b" style={{ borderColor: t.metricGap }}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: t.textFaint }}>Status History</span>
-            {stats.uptimePct != null && <span className="text-[10px] font-mono" style={{ color: uptimeColor }}>{stats.uptimePct}% up</span>}
+            <span className="wt-eyebrow">Status History</span>
+            {stats.uptimePct != null && <span className="text-[10px] wt-mono" style={{ color: uptimeColor }}>{stats.uptimePct}% up</span>}
           </div>
           <UptimeBlocks history={history} count={60} blockHeight={12} />
         </div>
@@ -661,14 +672,14 @@ export function MonitorDetailModal({
         {/* ── Timing waterfall ── */}
         {isHttpLike && monitor.latest?.dnsMs != null && (
           <div className="px-8 py-3 border-b flex items-center gap-3 flex-wrap" style={{ borderColor: t.metricGap }}>
-            <span className="text-[10px] font-mono uppercase tracking-wider shrink-0 mr-1" style={{ color: t.textFaint }}>Latest</span>
-            <TimingChip label="DNS"  value={monitor.latest.dnsMs}  color="#3b82f6" t={t} />
-            <TimingChip label="TCP"  value={monitor.latest.tcpMs}  color="#22c55e" t={t} />
-            {monitor.latest.tlsMs != null && <TimingChip label="TLS" value={monitor.latest.tlsMs} color="#f59e0b" t={t} />}
-            <TimingChip label="TTFB" value={monitor.latest.ttfbMs} color="#a78bfa" t={t} />
+            <span className="wt-eyebrow shrink-0 mr-1">Latest</span>
+            <TimingChip label="DNS"  value={monitor.latest.dnsMs}  color={VIZ.dns}  t={t} />
+            <TimingChip label="TCP"  value={monitor.latest.tcpMs}  color={VIZ.tcp}  t={t} />
+            {monitor.latest.tlsMs != null && <TimingChip label="TLS" value={monitor.latest.tlsMs} color={VIZ.tls} t={t} />}
+            <TimingChip label="TTFB" value={monitor.latest.ttfbMs} color={VIZ.ttfb} t={t} />
             {monitor.latest.httpStatus != null && (
-              <span className={`text-xs font-mono ml-auto ${monitor.latest.httpStatus < 400 ? '' : 'text-red-400'}`}
-                style={monitor.latest.httpStatus < 400 ? { color: t.textFaint } : {}}>
+              <span className="text-xs wt-mono ml-auto"
+                style={{ color: monitor.latest.httpStatus < 400 ? t.textFaint : 'var(--wt-down-500)' }}>
                 HTTP {monitor.latest.httpStatus}
               </span>
             )}
@@ -684,15 +695,15 @@ export function MonitorDetailModal({
             { id: 'embed',     label: 'Embed'      },
           ].map(tab => (
             <button key={tab.id} onClick={() => switchTab(tab.id)}
-              className="px-5 py-3 text-xs font-mono font-semibold transition-colors border-b-2 -mb-px flex items-center gap-1"
+              className="px-5 py-3 text-xs wt-mono font-semibold transition-colors border-b-2 -mb-px flex items-center gap-1"
               style={{
-                color:           activeTab === tab.id ? '#60a5fa' : t.textMuted,
-                borderColor:     activeTab === tab.id ? '#60a5fa' : 'transparent',
+                color:           activeTab === tab.id ? 'var(--wt-brand-400)' : t.textMuted,
+                borderColor:     activeTab === tab.id ? 'var(--wt-brand-400)' : 'transparent',
                 backgroundColor: 'transparent',
               }}>
               {tab.label}
               {tab.id === 'incidents' && stats.incidents > 0 && (
-                <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />
+                <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: 'var(--wt-down-500)' }} />
               )}
             </button>
           ))}
@@ -711,39 +722,29 @@ export function MonitorDetailModal({
                 style={{ borderColor: t.metricGap, backgroundColor: t.cardBg }}>
                 <div className="flex items-center gap-2">
                   <ArrowLeftRight size={12} style={{ color: t.textFaint }} />
-                  <span className="text-xs font-mono" style={{ color: t.textFaint }}>Width</span>
-                  <div className="flex rounded border overflow-hidden" style={{ borderColor: t.cardBorder }}>
+                  <span className="text-xs wt-mono" style={{ color: t.textFaint }}>Width</span>
+                  <div className="wt-seg">
                     {[1, 2].map(w => (
-                      <button key={w} type="button" onClick={() => onSetWidth?.(w)}
-                        className="px-2.5 py-1 text-xs font-mono transition-colors"
-                        style={width === w
-                          ? { backgroundColor: 'rgba(59,130,246,0.2)', color: '#93c5fd' }
-                          : { backgroundColor: t.inputBg, color: t.textMuted }}>
+                      <button key={w} type="button" onClick={() => onSetWidth?.(w)} aria-selected={width === w}>
                         {w === 1 ? 'Narrow' : 'Wide'}
                       </button>
                     ))}
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                  {deleteError && <span className="text-xs font-mono text-red-400">{deleteError}</span>}
+                  {deleteError && <span className="text-xs wt-mono" style={{ color: 'var(--wt-down-600)' }}>{deleteError}</span>}
                   {confirmDelete ? (
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono" style={{ color: '#f87171' }}>Sure?</span>
-                      <button type="button" onClick={handleDelete}
-                        className="px-2.5 py-1 text-xs font-mono rounded border"
-                        style={{ backgroundColor: 'rgba(239,68,68,0.15)', borderColor: 'rgba(239,68,68,0.4)', color: '#f87171' }}>
+                      <span className="text-xs wt-mono" style={{ color: 'var(--wt-down-600)' }}>Sure?</span>
+                      <button type="button" onClick={handleDelete} className="wt-btn wt-btn--danger wt-btn--sm">
                         Delete
                       </button>
-                      <button type="button" onClick={() => setConfirmDelete(false)}
-                        className="px-2.5 py-1 text-xs font-mono rounded border"
-                        style={{ color: t.textMuted, borderColor: t.cardBorder, backgroundColor: t.inputBg }}>
+                      <button type="button" onClick={() => setConfirmDelete(false)} className="wt-btn wt-btn--ghost wt-btn--sm">
                         Cancel
                       </button>
                     </div>
                   ) : (
-                    <button type="button" onClick={() => setConfirmDelete(true)}
-                      className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded border"
-                      style={{ color: t.textMuted, borderColor: t.cardBorder, backgroundColor: t.inputBg }}>
+                    <button type="button" onClick={() => setConfirmDelete(true)} className="wt-btn wt-btn--ghost wt-btn--sm">
                       <Trash2 size={11} /> Delete
                     </button>
                   )}
