@@ -13,7 +13,14 @@ import { formatTimestamp, formatInterval } from '../types/monitor';
 // ---------------------------------------------------------------------------
 
 const CHECK_TYPE_LABELS = { http: 'HTTP', api: 'API', tcp: 'TCP', icmp: 'ICMP' };
-const WINDOWS = ['15m', '1h', '6h', '12h', '1d', '1w', '30d'];
+// Surfaced as a 5-option segmented control (matches the dashboard).
+const SEG_WINDOWS = [
+  { label: '1H',  value: '1h'  },
+  { label: '6H',  value: '6h'  },
+  { label: '24H', value: '1d'  },
+  { label: '7D',  value: '1w'  },
+  { label: '30D', value: '30d' },
+];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -461,14 +468,10 @@ export function MonitorDetailModal({
 
         {/* Right: window selector + close */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="flex items-center gap-0.5 p-0.5 rounded-lg border" style={{ borderColor: t.cardBorder }}>
-            {WINDOWS.map(w => (
-              <button key={w} onClick={() => changeWindow(w)}
-                className="px-2 py-0.5 text-xs font-mono rounded transition-colors"
-                style={historyWindow === w
-                  ? { backgroundColor: 'rgba(96,165,250,0.15)', color: '#60a5fa' }
-                  : { backgroundColor: 'transparent', color: t.textMuted }}>
-                {w}
+          <div className="wt-seg">
+            {SEG_WINDOWS.map(w => (
+              <button key={w.value} aria-selected={historyWindow === w.value} onClick={() => changeWindow(w.value)}>
+                {w.label}
               </button>
             ))}
           </div>

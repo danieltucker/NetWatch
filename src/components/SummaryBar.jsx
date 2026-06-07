@@ -21,7 +21,7 @@ export function SummaryBar({ monitors }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-6 mb-5">
       {tiles.map(tt => (
         <div key={tt.label} className={`wt-tile ${tt.tone}`}>
           <div className="wt-tile__head">
