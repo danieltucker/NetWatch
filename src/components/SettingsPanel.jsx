@@ -244,10 +244,8 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
     }
   };
 
-  const inputCls   = 'w-full rounded-lg border px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/60 transition-all';
-  const inputStyle = { backgroundColor: t.inputBg, color: t.textPrimary, borderColor: t.cardBorder };
-
-  const sidebarBg = isDark ? '#12171e' : '#f0f3f6';
+  const inputCls   = 'w-full wt-input wt-mono';
+  const inputStyle = {};
 
   const activeTabDef = TABS.find(tab => tab.id === activeTab);
   const contentSubtitle =
@@ -269,7 +267,7 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
       <div
         className="flex w-full h-full sm:rounded-2xl sm:border sm:shadow-2xl overflow-hidden sm:w-full sm:max-w-[760px] sm:h-[680px] sm:max-h-[calc(100vh-2rem)]"
         style={{
-          backgroundColor: sidebarBg,
+          backgroundColor: 'var(--wt-bg)',
           borderColor:     t.cardBorder,
           boxShadow: isDark
             ? '0 25px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.05)'
@@ -279,21 +277,21 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
         {/* ── Sidebar — full width on mobile (tab list view), fixed 200px on desktop ── */}
         <aside
           className={`${mobileContentOpen ? 'hidden sm:flex' : 'flex'} flex-col w-full sm:w-[200px] shrink-0`}
-          style={{ background: sidebarBg, borderRight: `1px solid ${t.cardBorder}` }}>
+          style={{ background: 'var(--wt-bg)', borderRight: `1px solid ${t.cardBorder}` }}>
 
           {/* Mobile header: title + close button */}
           <div className="flex items-center justify-between px-5 pt-6 pb-3 sm:hidden">
             <div className="flex items-center gap-2.5">
-              <Settings2 size={15} style={{ color: '#60a5fa' }} />
-              <span className="text-sm font-mono font-bold uppercase tracking-[0.15em]"
+              <Settings2 size={15} style={{ color: 'var(--wt-brand-400)' }} />
+              <span className="text-sm wt-mono font-bold uppercase tracking-[0.15em]"
                 style={{ color: t.textSecondary }}>
                 Settings
               </span>
             </div>
             <button
               onClick={onClose}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-mono font-medium transition-colors"
-              style={{ color: t.textMuted, borderColor: t.cardBorder, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }}>
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm wt-mono font-medium transition-colors"
+              style={{ color: t.textMuted, borderColor: t.cardBorder, backgroundColor: 'var(--wt-surface-2)' }}>
               <X size={14} /> Close
             </button>
           </div>
@@ -301,8 +299,8 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
           {/* Desktop header: brand only */}
           <div className="hidden sm:block px-5 pt-6 pb-4">
             <div className="flex items-center gap-2.5 mb-1">
-              <Settings2 size={14} style={{ color: '#60a5fa' }} />
-              <span className="text-xs font-mono font-bold uppercase tracking-[0.15em]"
+              <Settings2 size={14} style={{ color: 'var(--wt-brand-400)' }} />
+              <span className="text-xs wt-mono font-bold uppercase tracking-[0.15em]"
                 style={{ color: t.textSecondary }}>
                 Settings
               </span>
@@ -321,14 +319,12 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
                 <button
                   key={id}
                   onClick={() => { setActiveTab(id); setMobileContentOpen(true); }}
-                  className="w-full flex items-center gap-3 px-3 py-3.5 sm:py-2.5 rounded-lg text-sm font-mono transition-all text-left"
+                  className="w-full flex items-center gap-3 px-3 py-3.5 sm:py-2.5 rounded-lg text-sm wt-mono transition-all text-left"
                   style={{
-                    color:           isActive ? '#60a5fa' : t.textMuted,
-                    backgroundColor: isActive
-                      ? isDark ? 'rgba(96,165,250,0.12)' : 'rgba(59,130,246,0.08)'
-                      : 'transparent',
+                    color:           isActive ? 'var(--wt-brand-400)' : t.textMuted,
+                    backgroundColor: isActive ? 'color-mix(in oklch, var(--wt-brand-500) 10%, transparent)' : 'transparent',
                     fontWeight: isActive ? 600 : 400,
-                    borderLeft: isActive ? '2px solid #60a5fa' : '2px solid transparent',
+                    borderLeft: isActive ? '2px solid var(--wt-brand-400)' : '2px solid transparent',
                   }}>
                   <Icon size={15} style={{ flexShrink: 0, opacity: isActive ? 1 : 0.6 }} />
                   {label}
@@ -339,14 +335,15 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
 
           {/* Version label — desktop only */}
           <div className="hidden sm:block px-5 py-5">
-            <div className="text-xs font-mono" style={{ color: t.textFaint }}>
+            <div className="text-xs wt-mono" style={{ color: t.textFaint }}>
               NetWatch v6.6.0
             </div>
           </div>
         </aside>
 
         {/* ── Content panel — hidden on mobile until a tab is selected ── */}
-        <div className={`${mobileContentOpen ? 'flex' : 'hidden sm:flex'} flex-1 flex-col min-w-0`}>
+        <div className={`${mobileContentOpen ? 'flex' : 'hidden sm:flex'} flex-1 flex-col min-w-0`}
+          style={{ backgroundColor: t.cardBg }}>
 
           {/* Content header */}
           <div className="flex items-center gap-3 px-5 sm:px-7 pt-5 sm:pt-6 pb-4 shrink-0">
@@ -354,19 +351,19 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
             {/* Back button — mobile only */}
             <button
               onClick={() => setMobileContentOpen(false)}
-              className="sm:hidden flex items-center gap-1 px-2 py-1.5 -ml-1 rounded-lg text-sm font-mono transition-colors"
-              style={{ color: '#60a5fa' }}>
+              className="sm:hidden flex items-center gap-1 px-2 py-1.5 -ml-1 rounded-lg text-sm wt-mono transition-colors"
+              style={{ color: 'var(--wt-brand-400)' }}>
               <ChevronLeft size={16} />
               Back
             </button>
 
             {/* Title block */}
             <div className="flex-1 min-w-0">
-              <h2 className="text-base font-semibold font-mono"
+              <h2 className="text-base font-semibold wt-mono"
                 style={{ color: t.textPrimary }}>
                 {activeTabDef?.label}
               </h2>
-              <p className="text-xs font-mono mt-0.5 hidden sm:block" style={{ color: t.textMuted }}>
+              <p className="text-xs wt-mono mt-0.5 hidden sm:block" style={{ color: t.textMuted }}>
                 {contentSubtitle}
               </p>
             </div>
@@ -374,8 +371,8 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
             {/* Close — unified "✕ Close" pill on all screen sizes */}
             <button
               onClick={onClose}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-mono font-medium transition-colors"
-              style={{ color: t.textMuted, borderColor: t.cardBorder, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }}>
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm wt-mono font-medium transition-colors"
+              style={{ color: t.textMuted, borderColor: t.cardBorder, backgroundColor: 'var(--wt-surface-2)' }}>
               <X size={14} /> Close
             </button>
           </div>
@@ -406,7 +403,6 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
                 inputCls={inputCls}
                 inputStyle={inputStyle}
                 t={t}
-                isDark={isDark}
               />
             )}
             {activeTab === 'network' && (
@@ -416,7 +412,6 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
                 networkRefsCustom={networkRefsCustom}
                 setNetworkRefsCustom={setNetworkRefsCustom}
                 t={t}
-                isDark={isDark}
               />
             )}
             {activeTab === 'modules' && (
@@ -426,11 +421,10 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
                 moduleSaving={moduleSaving}
                 moduleSaved={moduleSaved}
                 t={t}
-                isDark={isDark}
               />
             )}
             {activeTab === 'api-keys' && (
-              <ApiKeysTab t={t} isDark={isDark} />
+              <ApiKeysTab t={t} />
             )}
             {activeTab === 'notifications' && (
               <NotificationsTab
@@ -453,11 +447,11 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
               className="flex items-center justify-between gap-4 px-5 sm:px-7 py-4 border-t shrink-0"
               style={{ borderColor: t.cardBorder }}>
               {saveError
-                ? <span className="flex items-center gap-1.5 text-xs font-mono text-red-400 leading-snug">
+                ? <span className="flex items-center gap-1.5 text-xs wt-mono leading-snug" style={{ color: 'var(--wt-down-600)' }}>
                     <AlertCircle size={13} className="shrink-0" />
                     {saveError}
                   </span>
-                : <span className="text-xs font-mono hidden sm:block" style={{ color: t.textFaint }}>
+                : <span className="text-xs wt-mono hidden sm:block" style={{ color: t.textFaint }}>
                     {activeTab === 'reports'
                       ? 'Reports use the Email channel configured in Notifications'
                       : activeTab === 'network'
@@ -468,11 +462,15 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
               <button
                 onClick={save}
                 disabled={saving}
-                className="flex items-center gap-2 px-5 py-2.5 sm:py-2 rounded-lg text-sm sm:text-xs font-mono font-bold transition-all disabled:opacity-60 shrink-0 ml-auto"
+                className="flex items-center gap-2 px-5 py-2.5 sm:py-2 rounded-lg text-sm sm:text-xs wt-mono font-bold transition-all disabled:opacity-60 shrink-0 ml-auto"
                 style={{
-                  background: saved ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                  color: '#fff',
-                  boxShadow: saved ? '0 2px 12px rgba(34,197,94,0.35)' : '0 2px 12px rgba(59,130,246,0.35)',
+                  background: saved
+                    ? 'linear-gradient(135deg, var(--wt-up-600), var(--wt-up-700))'
+                    : 'linear-gradient(135deg, var(--wt-brand-500), var(--wt-brand-600))',
+                  color: 'var(--wt-text-on-brand)',
+                  boxShadow: saved
+                    ? '0 2px 12px color-mix(in oklch, var(--wt-up-500) 35%, transparent)'
+                    : '0 2px 12px color-mix(in oklch, var(--wt-brand-500) 35%, transparent)',
                 }}>
                 {saving ? <><Loader size={12} className="animate-spin" /> Saving…</> :
                  saved  ? <><CheckCircle size={12} /> Saved</> :
@@ -508,8 +506,7 @@ function GeneralTab({ chartYMax, onChartYMaxChange, alertsAutoOpen, onAlertsAuto
       <SettingRow
         title="Display mode"
         description="Choose light or dark, or follow your operating system setting."
-        t={t}
-        isDark={isDark}>
+        t={t}>
         <div className="flex shrink-0">
           {THEME_OPTIONS.map(({ value, label }, i) => {
             const isActive = themeMode === value;
@@ -519,17 +516,17 @@ function GeneralTab({ chartYMax, onChartYMaxChange, alertsAutoOpen, onAlertsAuto
               <button
                 key={value}
                 onClick={() => setThemeMode(value)}
-                className="px-4 py-1.5 text-xs font-mono font-medium border transition-all"
+                className="px-4 py-1.5 text-xs wt-mono font-medium border transition-all"
                 style={{
                   borderRadius:    isFirst ? '0.5rem 0 0 0.5rem' : isLast ? '0 0.5rem 0.5rem 0' : '0',
                   marginLeft:      i > 0 ? '-1px' : 0,
                   position:        'relative',
                   zIndex:          isActive ? 1 : 0,
                   backgroundColor: isActive
-                    ? isDark ? 'rgba(96,165,250,0.15)' : 'rgba(59,130,246,0.1)'
-                    : isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                  borderColor:     isActive ? '#60a5fa' : t.cardBorder,
-                  color:           isActive ? '#60a5fa' : t.textSecondary,
+                    ? 'color-mix(in oklch, var(--wt-brand-500) 12%, transparent)'
+                    : 'var(--wt-surface-2)',
+                  borderColor:     isActive ? 'var(--wt-brand-400)' : t.cardBorder,
+                  color:           isActive ? 'var(--wt-brand-400)' : t.textSecondary,
                 }}>
                 {label}
               </button>
@@ -541,12 +538,11 @@ function GeneralTab({ chartYMax, onChartYMaxChange, alertsAutoOpen, onAlertsAuto
       <SettingRow
         title="Chart scale"
         description="Maximum ping value shown on all graphs. Auto adjusts to your data; a fixed value lets you compare monitors side by side on the same scale."
-        t={t}
-        isDark={isDark}>
+        t={t}>
         <select
           value={chartYMax}
           onChange={e => onChartYMaxChange?.(e.target.value)}
-          className="text-xs font-mono rounded-lg border px-2.5 py-1.5 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          className="text-xs wt-mono wt-input appearance-none cursor-pointer"
           style={{ backgroundColor: t.inputBg, color: t.textSecondary, borderColor: t.cardBorder }}>
           {CHART_Y_OPTIONS.map(o => (
             <option key={o.value} value={o.value}>{o.label}</option>
@@ -557,12 +553,11 @@ function GeneralTab({ chartYMax, onChartYMaxChange, alertsAutoOpen, onAlertsAuto
       <SettingRow
         title="Auto-open alerts panel"
         description="Automatically expand the alerts panel when a new alert is detected via live updates."
-        t={t}
-        isDark={isDark}>
+        t={t}>
         <select
           value={alertsAutoOpen}
           onChange={e => onAlertsAutoOpenChange?.(e.target.value)}
-          className="text-xs font-mono rounded-lg border px-2.5 py-1.5 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          className="text-xs wt-mono wt-input appearance-none cursor-pointer"
           style={{ backgroundColor: t.inputBg, color: t.textSecondary, borderColor: t.cardBorder }}>
           <option value="outage">On outage only</option>
           <option value="both">On any alert</option>
@@ -659,9 +654,9 @@ function NotificationsTab({ settings, set, testState, test, inputCls, inputStyle
     set('email_auth_type',          'basic');
   };
 
-  // Returns input style with red border when the field has a validation error
+  // Returns input style with error border when the field has a validation error
   const fs = (key) => invalidFields.has(key)
-    ? { ...inputStyle, borderColor: '#ef4444', boxShadow: '0 0 0 2px rgba(239,68,68,0.15)' }
+    ? { borderColor: 'var(--wt-down-500)', boxShadow: '0 0 0 2px color-mix(in oklch, var(--wt-down-500) 15%, transparent)' }
     : inputStyle;
 
   // Whether any field in a set of keys is invalid (used to flag the channel card)
@@ -713,7 +708,7 @@ function NotificationsTab({ settings, set, testState, test, inputCls, inputStyle
           return (
             <>
               <div className="space-y-2 pb-1">
-                <div className="text-xs font-mono uppercase tracking-wider" style={{ color: t.textMuted }}>
+                <div className="text-xs wt-mono uppercase tracking-wider" style={{ color: t.textMuted }}>
                   Quick setup
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -728,13 +723,13 @@ function NotificationsTab({ settings, set, testState, test, inputCls, inputStyle
                           set('email_smtp_port', p.port);
                           set('email_auth_type', p.authType || 'basic');
                         }}
-                        className="px-3 py-1.5 rounded-lg border text-xs font-mono font-medium transition-all"
+                        className="px-3 py-1.5 rounded-lg border text-xs wt-mono font-medium transition-all"
                         style={{
                           backgroundColor: isActive
-                            ? isDark ? 'rgba(96,165,250,0.15)' : 'rgba(59,130,246,0.1)'
-                            : isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                          borderColor: isActive ? '#60a5fa' : t.cardBorder,
-                          color:       isActive ? '#60a5fa' : t.textSecondary,
+                            ? 'color-mix(in oklch, var(--wt-brand-500) 12%, transparent)'
+                            : 'var(--wt-surface-2)',
+                          borderColor: isActive ? 'var(--wt-brand-400)' : t.cardBorder,
+                          color:       isActive ? 'var(--wt-brand-400)' : t.textSecondary,
                         }}>
                         {p.name}
                       </button>
@@ -742,13 +737,13 @@ function NotificationsTab({ settings, set, testState, test, inputCls, inputStyle
                   })}
                 </div>
                 {active?.note && (
-                  <div className="flex items-start gap-1.5 text-xs font-mono leading-relaxed"
+                  <div className="flex items-start gap-1.5 text-xs wt-mono leading-relaxed"
                     style={{ color: t.textMuted }}>
-                    <AlertCircle size={11} className="mt-0.5 shrink-0" style={{ color: '#f59e0b' }} />
+                    <AlertCircle size={11} className="mt-0.5 shrink-0" style={{ color: 'var(--wt-warn-500)' }} />
                     {active.note}
                     {active.authType === 'oauth2' && (
                       <a href="https://portal.azure.com" target="_blank" rel="noopener noreferrer"
-                        className="ml-1 underline" style={{ color: '#60a5fa' }}>
+                        className="ml-1 underline" style={{ color: 'var(--wt-brand-400)' }}>
                         Azure Portal
                       </a>
                     )}
@@ -790,18 +785,22 @@ function NotificationsTab({ settings, set, testState, test, inputCls, inputStyle
                     {isOAuthConnected ? (
                       <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg"
                         style={{
-                          background:  isDark ? 'rgba(34,197,94,0.08)' : 'rgba(34,197,94,0.06)',
-                          border:      '1px solid rgba(34,197,94,0.2)',
+                          backgroundColor: 'color-mix(in oklch, var(--wt-up-500) 7%, transparent)',
+                          border:          '1px solid color-mix(in oklch, var(--wt-up-500) 20%, transparent)',
                         }}>
                         <div className="flex items-center gap-2 min-w-0">
-                          <CheckCircle size={13} style={{ color: '#22c55e', flexShrink: 0 }} />
-                          <span className="text-xs font-mono truncate" style={{ color: t.textSecondary }}>
+                          <CheckCircle size={13} style={{ color: 'var(--wt-up-500)', flexShrink: 0 }} />
+                          <span className="text-xs wt-mono truncate" style={{ color: t.textSecondary }}>
                             {settings.email_smtp_user}
                           </span>
                         </div>
                         <button type="button" onClick={disconnectOAuth}
-                          className="text-xs font-mono px-2 py-0.5 rounded flex-shrink-0"
-                          style={{ color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                          className="text-xs wt-mono px-2 py-0.5 rounded flex-shrink-0"
+                          style={{
+                            color:      'var(--wt-down-600)',
+                            background: 'color-mix(in oklch, var(--wt-down-500) 8%, transparent)',
+                            border:     '1px solid color-mix(in oklch, var(--wt-down-500) 20%, transparent)',
+                          }}>
                           Disconnect
                         </button>
                       </div>
@@ -809,11 +808,11 @@ function NotificationsTab({ settings, set, testState, test, inputCls, inputStyle
                       <div className="space-y-1.5">
                         <button type="button" onClick={startOAuthConnect}
                           disabled={oauthConnecting || !settings.email_oauth_client_id?.trim()}
-                          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-mono font-medium transition-all"
+                          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs wt-mono font-medium transition-all"
                           style={{
-                            background: isDark ? 'rgba(96,165,250,0.12)' : 'rgba(59,130,246,0.1)',
-                            border:     '1px solid rgba(96,165,250,0.3)',
-                            color:      '#60a5fa',
+                            background: 'color-mix(in oklch, var(--wt-brand-500) 11%, transparent)',
+                            border:     '1px solid color-mix(in oklch, var(--wt-brand-500) 30%, transparent)',
+                            color:      'var(--wt-brand-400)',
                             opacity:    (!settings.email_oauth_client_id?.trim() || oauthConnecting) ? 0.5 : 1,
                             cursor:     (!settings.email_oauth_client_id?.trim() || oauthConnecting) ? 'not-allowed' : 'pointer',
                           }}>
@@ -822,12 +821,12 @@ function NotificationsTab({ settings, set, testState, test, inputCls, inputStyle
                             : 'Connect Microsoft Account'}
                         </button>
                         {invalidFields.has('email_smtp_user') && (
-                          <div className="text-xs font-mono" style={{ color: '#ef4444' }}>
+                          <div className="text-xs wt-mono" style={{ color: 'var(--wt-down-600)' }}>
                             Microsoft account not connected — click Connect above
                           </div>
                         )}
                         {oauthError && (
-                          <div className="text-xs font-mono leading-relaxed" style={{ color: '#ef4444' }}>
+                          <div className="text-xs wt-mono leading-relaxed" style={{ color: 'var(--wt-down-600)' }}>
                             {oauthError}
                           </div>
                         )}
@@ -934,17 +933,15 @@ function NotificationsTab({ settings, set, testState, test, inputCls, inputStyle
 
 // ── Reports tab ───────────────────────────────────────────────────────────────
 
-function ReportsTab({ settings, set, reportLastSent, invalidFields, inputCls, inputStyle, t, isDark }) {
+function ReportsTab({ settings, set, reportLastSent, invalidFields, inputCls, inputStyle, t }) {
   const [testState, setTestState] = useState(null); // null | 'loading' | 'ok' | errorString
 
   const fmtLastSent = reportLastSent
     ? new Date(reportLastSent).toLocaleString()
     : 'Never';
 
-  const rowBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
-
   const timeStyle = invalidFields.has('report_time')
-    ? { ...inputStyle, borderColor: '#ef4444', boxShadow: '0 0 0 2px rgba(239,68,68,0.15)' }
+    ? { borderColor: 'var(--wt-down-500)', boxShadow: '0 0 0 2px color-mix(in oklch, var(--wt-down-500) 15%, transparent)' }
     : inputStyle;
 
   const sendTest = async () => {
@@ -967,12 +964,10 @@ function ReportsTab({ settings, set, reportLastSent, invalidFields, inputCls, in
       <SettingRow
         title="Enable reports"
         description="Send a periodic email summary covering uptime, average ping, and incident counts for all your monitors."
-        t={t}
-        isDark={isDark}>
+        t={t}>
         <Toggle
           enabled={settings.report_enabled === '1'}
           onToggle={v => set('report_enabled', v ? '1' : '')}
-          isDark={isDark}
         />
       </SettingRow>
 
@@ -982,8 +977,8 @@ function ReportsTab({ settings, set, reportLastSent, invalidFields, inputCls, in
         style={{ borderColor: t.cardBorder }}>
         <div
           className="px-5 py-3 border-b"
-          style={{ backgroundColor: rowBg, borderColor: t.cardBorder }}>
-          <div className="text-xs font-mono font-semibold uppercase tracking-wider"
+          style={{ backgroundColor: 'var(--wt-surface-2)', borderColor: t.cardBorder }}>
+          <div className="text-xs wt-mono font-semibold uppercase tracking-wider"
             style={{ color: t.textSecondary }}>
             Schedule
           </div>
@@ -992,14 +987,14 @@ function ReportsTab({ settings, set, reportLastSent, invalidFields, inputCls, in
         <div className="px-5 py-4 space-y-4" style={{ backgroundColor: t.cardBg }}>
           {/* Frequency */}
           <div>
-            <label className="block text-xs font-mono font-medium uppercase tracking-wider mb-1.5"
+            <label className="block text-xs wt-mono font-medium uppercase tracking-wider mb-1.5"
               style={{ color: t.textMuted }}>
               Frequency
             </label>
             <select
               value={settings.report_interval}
               onChange={e => set('report_interval', e.target.value)}
-              className="w-full rounded-lg border px-3 py-2.5 text-sm font-mono appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/60 transition-all"
+              className="w-full wt-input wt-mono appearance-none cursor-pointer"
               style={{ backgroundColor: t.inputBg, color: t.textPrimary, borderColor: t.cardBorder }}>
               <option value="daily">Daily — every 24 hours</option>
               <option value="weekly">Weekly — every 7 days</option>
@@ -1009,7 +1004,7 @@ function ReportsTab({ settings, set, reportLastSent, invalidFields, inputCls, in
 
           {/* Time */}
           <div>
-            <label className="block text-xs font-mono font-medium uppercase tracking-wider mb-1.5"
+            <label className="block text-xs wt-mono font-medium uppercase tracking-wider mb-1.5"
               style={{ color: t.textMuted }}>
               Send time <span style={{ color: t.textFaint }}>(server local time, 24-hour)</span>
             </label>
@@ -1024,7 +1019,7 @@ function ReportsTab({ settings, set, reportLastSent, invalidFields, inputCls, in
 
           {/* Tag filter */}
           <div>
-            <label className="block text-xs font-mono font-medium uppercase tracking-wider mb-1.5"
+            <label className="block text-xs wt-mono font-medium uppercase tracking-wider mb-1.5"
               style={{ color: t.textMuted }}>
               Tag filter <span style={{ color: t.textFaint }}>(optional — blank = all monitors)</span>
             </label>
@@ -1043,14 +1038,14 @@ function ReportsTab({ settings, set, reportLastSent, invalidFields, inputCls, in
       {/* Last sent + test button */}
       <div
         className="rounded-xl border px-5 py-4"
-        style={{ borderColor: t.cardBorder, backgroundColor: rowBg }}>
+        style={{ borderColor: t.cardBorder, backgroundColor: 'var(--wt-surface-2)' }}>
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-xs font-mono font-semibold uppercase tracking-wider mb-0.5"
+            <div className="text-xs wt-mono font-semibold uppercase tracking-wider mb-0.5"
               style={{ color: t.textSecondary }}>
               Last report sent
             </div>
-            <div className="text-sm font-mono truncate"
+            <div className="text-sm wt-mono truncate"
               style={{ color: reportLastSent ? t.textPrimary : t.textFaint }}>
               {fmtLastSent}
             </div>
@@ -1060,11 +1055,11 @@ function ReportsTab({ settings, set, reportLastSent, invalidFields, inputCls, in
           <button
             onClick={sendTest}
             disabled={testState === 'loading'}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border text-xs font-mono font-medium transition-all shrink-0 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border text-xs wt-mono font-medium transition-all shrink-0 disabled:opacity-50"
             style={{
-              color:           testState === 'ok' ? '#22c55e' : testState && testState !== 'loading' ? '#ef4444' : t.textSecondary,
-              borderColor:     testState === 'ok' ? '#22c55e' : testState && testState !== 'loading' ? '#ef4444' : t.cardBorder,
-              backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+              color:           testState === 'ok' ? 'var(--wt-up-600)' : testState && testState !== 'loading' ? 'var(--wt-down-600)' : t.textSecondary,
+              borderColor:     testState === 'ok' ? 'var(--wt-up-500)' : testState && testState !== 'loading' ? 'var(--wt-down-500)' : t.cardBorder,
+              backgroundColor: 'var(--wt-surface-2)',
             }}>
             {testState === 'loading' ? (
               <><Loader size={12} className="animate-spin" /> Sending…</>
@@ -1080,7 +1075,7 @@ function ReportsTab({ settings, set, reportLastSent, invalidFields, inputCls, in
 
         {/* Inline error from test */}
         {testState && testState !== 'loading' && testState !== 'ok' && (
-          <div className="mt-2 text-xs font-mono text-red-400 leading-snug">
+          <div className="mt-2 text-xs wt-mono leading-snug" style={{ color: 'var(--wt-down-600)' }}>
             {testState}
           </div>
         )}
@@ -1089,11 +1084,11 @@ function ReportsTab({ settings, set, reportLastSent, invalidFields, inputCls, in
       {/* Info note */}
       <div
         className="rounded-xl border px-5 py-4 space-y-1.5"
-        style={{ borderColor: t.cardBorder, backgroundColor: isDark ? 'rgba(59,130,246,0.05)' : 'rgba(59,130,246,0.04)' }}>
-        <div className="text-xs font-mono font-semibold" style={{ color: '#60a5fa' }}>
+        style={{ borderColor: t.cardBorder, backgroundColor: 'color-mix(in oklch, var(--wt-brand-500) 5%, transparent)' }}>
+        <div className="text-xs wt-mono font-semibold" style={{ color: 'var(--wt-brand-400)' }}>
           How reports work
         </div>
-        <div className="text-xs font-mono leading-relaxed" style={{ color: t.textMuted }}>
+        <div className="text-xs wt-mono leading-relaxed" style={{ color: t.textMuted }}>
           Reports use the SMTP credentials from the{' '}
           <span style={{ color: t.textSecondary }}>Notifications</span> tab — the Email channel
           does not need to be enabled for alerts, only configured. Each report covers the full
@@ -1106,12 +1101,12 @@ function ReportsTab({ settings, set, reportLastSent, invalidFields, inputCls, in
 
 // ── Modules tab ───────────────────────────────────────────────────────────────
 
-function ModulesTab({ moduleSettings, onSaveModuleSettings, moduleSaving, moduleSaved, t, isDark }) {
+function ModulesTab({ moduleSettings, onSaveModuleSettings, moduleSaving, moduleSaved, t }) {
   const mods = [...moduleRegistry.values()];
 
   if (mods.length === 0) {
     return (
-      <div className="py-12 text-center text-xs font-mono" style={{ color: t.textMuted }}>
+      <div className="py-12 text-center text-xs wt-mono" style={{ color: t.textMuted }}>
         No modules installed. See MODULES.md to build your own.
       </div>
     );
@@ -1134,18 +1129,17 @@ function ModulesTab({ moduleSettings, onSaveModuleSettings, moduleSaving, module
             saved={!!moduleSaved[mod.id]}
             onSave={fields => onSaveModuleSettings(mod.id, fields)}
             t={t}
-            isDark={isDark}
           />
         );
       })}
 
       {/* Install instructions */}
       <div className="rounded-xl border px-5 py-4 space-y-1"
-        style={{ borderColor: t.cardBorder, backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)' }}>
-        <div className="text-xs font-mono font-semibold" style={{ color: t.textSecondary }}>
+        style={{ borderColor: t.cardBorder, backgroundColor: 'var(--wt-surface-2)' }}>
+        <div className="text-xs wt-mono font-semibold" style={{ color: t.textSecondary }}>
           Add a module
         </div>
-        <div className="text-xs font-mono leading-relaxed" style={{ color: t.textMuted }}>
+        <div className="text-xs wt-mono leading-relaxed" style={{ color: t.textMuted }}>
           Drop a module folder into <span style={{ color: t.textSecondary }}>server/src/modules/</span> and{' '}
           <span style={{ color: t.textSecondary }}>src/modules/</span>, then restart the server.
           The module will appear here automatically.
@@ -1154,8 +1148,8 @@ function ModulesTab({ moduleSettings, onSaveModuleSettings, moduleSaving, module
           href="MODULES.md"
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1 text-xs font-mono mt-1"
-          style={{ color: '#60a5fa' }}>
+          className="inline-flex items-center gap-1 text-xs wt-mono mt-1"
+          style={{ color: 'var(--wt-brand-400)' }}>
           Read MODULES.md <ExternalLink size={10} />
         </a>
       </div>
@@ -1163,7 +1157,7 @@ function ModulesTab({ moduleSettings, onSaveModuleSettings, moduleSaving, module
   );
 }
 
-function ModuleSection({ mod, localValues, saving, saved, onSave, t, isDark }) {
+function ModuleSection({ mod, localValues, saving, saved, onSave, t }) {
   const [fields, setFields] = useState({ ...localValues });
 
   // Sync when async-loaded settings arrive after initial render
@@ -1173,24 +1167,23 @@ function ModuleSection({ mod, localValues, saving, saved, onSave, t, isDark }) {
 
   const setField = (k, v) => setFields(prev => ({ ...prev, [k]: v }));
 
-  const inputCls   = 'w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/60 transition-all';
-  const inputStyle = { backgroundColor: t.inputBg, color: t.textPrimary, borderColor: t.cardBorder };
-  const IconComponent = mod.icon ? null : null; // resolved from frontend registry — icon is a component
+  const inputCls   = 'w-full wt-input wt-mono';
+  const inputStyle = {};
 
   return (
     <div className="rounded-xl border overflow-hidden" style={{ borderColor: t.cardBorder }}>
       {/* Module header */}
       <div className="flex items-center justify-between px-5 py-3.5 border-b"
         style={{
-          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+          backgroundColor: 'var(--wt-surface-2)',
           borderColor: t.cardBorder,
         }}>
         <div>
-          <div className="text-sm font-mono font-semibold" style={{ color: t.textPrimary }}>
+          <div className="text-sm wt-mono font-semibold" style={{ color: t.textPrimary }}>
             {mod.name}
             <span className="ml-2 text-xs font-normal" style={{ color: t.textFaint }}>v{mod.version}</span>
           </div>
-          <div className="text-xs font-mono mt-0.5" style={{ color: t.textMuted }}>
+          <div className="text-xs wt-mono mt-0.5" style={{ color: t.textMuted }}>
             {mod.description}
           </div>
         </div>
@@ -1198,19 +1191,19 @@ function ModuleSection({ mod, localValues, saving, saved, onSave, t, isDark }) {
 
       <div className="px-5 py-4 space-y-4">
         {mod.settingsSchema?.length === 0 && (
-          <p className="text-xs font-mono" style={{ color: t.textFaint }}>
+          <p className="text-xs wt-mono" style={{ color: t.textFaint }}>
             No credentials required. Use <strong>Add</strong> on the dashboard to place cards.
           </p>
         )}
         {/* Credential fields */}
         {mod.settingsSchema?.length > 0 && (
           <div className="space-y-3">
-            <div className="text-xs font-mono uppercase tracking-wider" style={{ color: t.textMuted }}>
+            <div className="text-xs wt-mono uppercase tracking-wider" style={{ color: t.textMuted }}>
               Credentials
             </div>
             {mod.settingsSchema.map(field => (
               <div key={field.key}>
-                <label className="block text-xs font-mono font-medium uppercase tracking-wider mb-1.5"
+                <label className="block text-xs wt-mono font-medium uppercase tracking-wider mb-1.5"
                   style={{ color: t.textMuted }}>
                   {field.label}{field.required ? ' *' : ''}
                 </label>
@@ -1223,7 +1216,7 @@ function ModuleSection({ mod, localValues, saving, saved, onSave, t, isDark }) {
                   style={inputStyle}
                 />
                 {field.hint && (
-                  <p className="text-xs font-mono mt-1 leading-relaxed" style={{ color: t.textFaint }}>
+                  <p className="text-xs wt-mono mt-1 leading-relaxed" style={{ color: t.textFaint }}>
                     {field.hint}
                   </p>
                 )}
@@ -1232,11 +1225,15 @@ function ModuleSection({ mod, localValues, saving, saved, onSave, t, isDark }) {
             <button
               onClick={() => onSave(fields)}
               disabled={saving}
-              className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-mono font-bold transition-all disabled:opacity-60"
+              className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs wt-mono font-bold transition-all disabled:opacity-60"
               style={{
-                background:  saved ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                color:       '#fff',
-                boxShadow:   saved ? '0 2px 8px rgba(34,197,94,0.3)' : '0 2px 8px rgba(59,130,246,0.3)',
+                background: saved
+                  ? 'linear-gradient(135deg, var(--wt-up-600), var(--wt-up-700))'
+                  : 'linear-gradient(135deg, var(--wt-brand-500), var(--wt-brand-600))',
+                color:     'var(--wt-text-on-brand)',
+                boxShadow: saved
+                  ? '0 2px 8px color-mix(in oklch, var(--wt-up-500) 30%, transparent)'
+                  : '0 2px 8px color-mix(in oklch, var(--wt-brand-500) 30%, transparent)',
               }}>
               {saving ? <><Loader size={11} className="animate-spin" /> Saving…</> :
                saved  ? <><CheckCircle size={11} /> Saved</>                      :
@@ -1252,19 +1249,19 @@ function ModuleSection({ mod, localValues, saving, saved, onSave, t, isDark }) {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function SettingRow({ title, description, children, t, isDark }) {
+function SettingRow({ title, description, children, t }) {
   return (
     <div
       className="flex items-center justify-between gap-6 px-4 py-4 rounded-xl border"
       style={{
         borderColor:     t.cardBorder,
-        backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+        backgroundColor: 'var(--wt-surface-2)',
       }}>
       <div>
-        <div className="text-sm font-mono font-semibold" style={{ color: t.textPrimary }}>
+        <div className="text-sm wt-mono font-semibold" style={{ color: t.textPrimary }}>
           {title}
         </div>
-        <div className="text-xs font-mono mt-1 leading-relaxed" style={{ color: t.textMuted }}>
+        <div className="text-xs wt-mono mt-1 leading-relaxed" style={{ color: t.textMuted }}>
           {description}
         </div>
       </div>
@@ -1273,7 +1270,7 @@ function SettingRow({ title, description, children, t, isDark }) {
   );
 }
 
-function Toggle({ enabled, onToggle, isDark }) {
+function Toggle({ enabled, onToggle }) {
   return (
     <button
       onClick={() => onToggle(!enabled)}
@@ -1282,21 +1279,21 @@ function Toggle({ enabled, onToggle, isDark }) {
         width:           44,
         height:          24,
         borderRadius:    12,
-        backgroundColor: enabled ? '#3b82f6' : isDark ? '#374151' : '#d1d5db',
-        boxShadow:       enabled ? '0 0 0 3px rgba(59,130,246,0.2)' : 'none',
+        backgroundColor: enabled ? 'var(--wt-brand-500)' : 'var(--wt-n-400)',
+        boxShadow:       enabled ? '0 0 0 3px color-mix(in oklch, var(--wt-brand-500) 20%, transparent)' : 'none',
         transition:      'background-color 0.2s, box-shadow 0.2s',
       }}>
       <span
         style={{
-          position:       'absolute',
-          top:            3,
-          left:           enabled ? 23 : 3,
-          width:          18,
-          height:         18,
-          borderRadius:   9,
-          backgroundColor:'#fff',
-          boxShadow:      '0 1px 3px rgba(0,0,0,0.3)',
-          transition:     'left 0.2s',
+          position:        'absolute',
+          top:             3,
+          left:            enabled ? 23 : 3,
+          width:           18,
+          height:          18,
+          borderRadius:    9,
+          backgroundColor: '#fff',
+          boxShadow:       '0 1px 3px rgba(0,0,0,0.3)',
+          transition:      'left 0.2s',
         }}
       />
     </button>
@@ -1313,9 +1310,9 @@ function Channel({ title, description, enabled, hasError = false, onToggle, test
       className="rounded-xl border overflow-hidden"
       style={{
         borderColor: hasError
-          ? '#ef4444'
+          ? 'var(--wt-down-500)'
           : enabled
-            ? isDark ? 'rgba(59,130,246,0.3)' : 'rgba(59,130,246,0.25)'
+            ? 'color-mix(in oklch, var(--wt-brand-500) 27%, transparent)'
             : t.cardBorder,
         transition: 'border-color 0.2s',
       }}>
@@ -1325,10 +1322,10 @@ function Channel({ title, description, enabled, hasError = false, onToggle, test
         className="flex items-center justify-between px-5 py-3.5"
         style={{
           backgroundColor: enabled
-            ? isDark ? 'rgba(59,130,246,0.07)' : 'rgba(59,130,246,0.04)'
-            : isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+            ? 'color-mix(in oklch, var(--wt-brand-500) 6%, transparent)'
+            : 'var(--wt-surface-2)',
           borderBottom: `1px solid ${enabled
-            ? isDark ? 'rgba(59,130,246,0.2)' : 'rgba(59,130,246,0.15)'
+            ? 'color-mix(in oklch, var(--wt-brand-500) 17%, transparent)'
             : t.cardBorder}`,
         }}>
         <div>
@@ -1336,18 +1333,18 @@ function Channel({ title, description, enabled, hasError = false, onToggle, test
             {enabled && (
               <span
                 className="inline-flex h-1.5 w-1.5 rounded-full"
-                style={{ backgroundColor: '#3b82f6' }}
+                style={{ backgroundColor: 'var(--wt-brand-500)' }}
               />
             )}
-            <span className="text-sm font-mono font-semibold" style={{ color: t.textPrimary }}>
+            <span className="text-sm wt-mono font-semibold" style={{ color: t.textPrimary }}>
               {title}
             </span>
           </div>
-          <div className="text-xs font-mono mt-0.5" style={{ color: t.textMuted }}>
+          <div className="text-xs wt-mono mt-0.5" style={{ color: t.textMuted }}>
             {description}
           </div>
         </div>
-        <Toggle enabled={enabled} onToggle={onToggle} isDark={isDark} />
+        <Toggle enabled={enabled} onToggle={onToggle} />
       </div>
 
       {/* Fields */}
@@ -1359,9 +1356,9 @@ function Channel({ title, description, enabled, hasError = false, onToggle, test
           <button
             onClick={onTest}
             disabled={isLoading}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-mono font-medium transition-all disabled:opacity-50"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs wt-mono font-medium transition-all disabled:opacity-50"
             style={{
-              backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+              backgroundColor: 'var(--wt-surface-2)',
               border:          `1px solid ${t.cardBorder}`,
               color:           t.textSecondary,
             }}
@@ -1372,12 +1369,12 @@ function Channel({ title, description, enabled, hasError = false, onToggle, test
               : <><Send size={11} /> Send test</>}
           </button>
           {isOk && (
-            <span className="flex items-center gap-1.5 text-xs font-mono" style={{ color: '#4ade80' }}>
+            <span className="flex items-center gap-1.5 text-xs wt-mono" style={{ color: 'var(--wt-up-600)' }}>
               <CheckCircle size={12} /> Delivered
             </span>
           )}
           {isError && (
-            <span className="flex items-center gap-1.5 text-xs font-mono text-red-400 max-w-xs truncate">
+            <span className="flex items-center gap-1.5 text-xs wt-mono max-w-xs truncate" style={{ color: 'var(--wt-down-600)' }}>
               <AlertCircle size={12} className="shrink-0" /> {testState}
             </span>
           )}
@@ -1390,8 +1387,8 @@ function Channel({ title, description, enabled, hasError = false, onToggle, test
 function Field({ label, invalid = false, children, t }) {
   return (
     <div>
-      <label className="block text-xs font-mono font-medium uppercase tracking-wider mb-1.5"
-        style={{ color: invalid ? '#f87171' : t.textMuted }}>
+      <label className="block text-xs wt-mono font-medium uppercase tracking-wider mb-1.5"
+        style={{ color: invalid ? 'var(--wt-down-600)' : t.textMuted }}>
         {label}{invalid && <span className="ml-1 normal-case tracking-normal">— required</span>}
       </label>
       {children}
@@ -1403,7 +1400,7 @@ function Field({ label, invalid = false, children, t }) {
 
 // ── Network tab ───────────────────────────────────────────────────────────────
 
-function NetworkTab({ networkRefsEnabled, setNetworkRefsEnabled, networkRefsCustom, setNetworkRefsCustom, t, isDark }) {
+function NetworkTab({ networkRefsEnabled, setNetworkRefsEnabled, networkRefsCustom, setNetworkRefsCustom, t }) {
   const [newLabel,  setNewLabel]  = useState('');
   const [newTarget, setNewTarget] = useState('');
   const [newType,   setNewType]   = useState('http');
@@ -1439,9 +1436,8 @@ function NetworkTab({ networkRefsEnabled, setNetworkRefsEnabled, networkRefsCust
     setNetworkRefsCustom(prev => prev.filter(c => c.target !== target));
   };
 
-  const inCls   = 'rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/60 transition-all';
-  const inStyle = { backgroundColor: t.inputBg, color: t.textPrimary, borderColor: t.cardBorder };
-  const rowBg   = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
+  const inCls   = 'wt-input wt-mono';
+  const inStyle = {};
 
   return (
     <div className="space-y-5">
@@ -1449,11 +1445,11 @@ function NetworkTab({ networkRefsEnabled, setNetworkRefsEnabled, networkRefsCust
       {/* Info banner */}
       <div
         className="rounded-xl border px-4 py-3.5 space-y-1"
-        style={{ borderColor: t.cardBorder, backgroundColor: isDark ? 'rgba(59,130,246,0.05)' : 'rgba(59,130,246,0.04)' }}>
-        <div className="text-xs font-mono font-semibold" style={{ color: '#60a5fa' }}>
+        style={{ borderColor: t.cardBorder, backgroundColor: 'color-mix(in oklch, var(--wt-brand-500) 5%, transparent)' }}>
+        <div className="text-xs wt-mono font-semibold" style={{ color: 'var(--wt-brand-400)' }}>
           What are network references?
         </div>
-        <div className="text-xs font-mono leading-relaxed" style={{ color: t.textMuted }}>
+        <div className="text-xs wt-mono leading-relaxed" style={{ color: t.textMuted }}>
           Reference monitors appear in a compact strip below your monitors and never trigger alerts.
           Enable a mix of HTTP and DNS/ICMP targets to quickly tell whether an outage is yours or a broader internet issue.
         </div>
@@ -1466,7 +1462,6 @@ function NetworkTab({ networkRefsEnabled, setNetworkRefsEnabled, networkRefsCust
         enabled={networkRefsEnabled}
         onToggle={togglePreset}
         t={t}
-        isDark={isDark}
       />
 
       {/* ICMP / DNS presets */}
@@ -1476,18 +1471,17 @@ function NetworkTab({ networkRefsEnabled, setNetworkRefsEnabled, networkRefsCust
         enabled={networkRefsEnabled}
         onToggle={togglePreset}
         t={t}
-        isDark={isDark}
       />
 
       {/* Custom references */}
       <div className="rounded-xl border overflow-hidden" style={{ borderColor: t.cardBorder }}>
         <div
           className="px-5 py-3 border-b"
-          style={{ backgroundColor: rowBg, borderColor: t.cardBorder }}>
-          <div className="text-xs font-mono font-semibold uppercase tracking-wider" style={{ color: t.textSecondary }}>
+          style={{ backgroundColor: 'var(--wt-surface-2)', borderColor: t.cardBorder }}>
+          <div className="text-xs wt-mono font-semibold uppercase tracking-wider" style={{ color: t.textSecondary }}>
             Custom
           </div>
-          <div className="text-xs font-mono mt-0.5" style={{ color: t.textMuted }}>
+          <div className="text-xs wt-mono mt-0.5" style={{ color: t.textMuted }}>
             Add any URL or IP — useful for routers, local servers, or private hosts
           </div>
         </div>
@@ -1500,15 +1494,15 @@ function NetworkTab({ networkRefsEnabled, setNetworkRefsEnabled, networkRefsCust
                 <div
                   key={entry.target}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg border"
-                  style={{ borderColor: t.cardBorder, backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)' }}>
+                  style={{ borderColor: t.cardBorder, backgroundColor: 'var(--wt-surface-2)' }}>
                   <span
-                    className="shrink-0 text-xs font-mono px-1.5 py-0.5 rounded border uppercase tracking-wide"
+                    className="shrink-0 text-xs wt-mono px-1.5 py-0.5 rounded border uppercase tracking-wide"
                     style={{ color: t.textFaint, borderColor: t.cardBorder, fontSize: 10 }}>
                     {entry.checkType}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-mono font-medium truncate" style={{ color: t.textPrimary }}>{entry.label}</div>
-                    <div className="text-xs font-mono truncate" style={{ color: t.textMuted }}>{entry.target}</div>
+                    <div className="text-xs wt-mono font-medium truncate" style={{ color: t.textPrimary }}>{entry.label}</div>
+                    <div className="text-xs wt-mono truncate" style={{ color: t.textMuted }}>{entry.target}</div>
                   </div>
                   <button
                     onClick={() => removeCustom(entry.target)}
@@ -1525,7 +1519,7 @@ function NetworkTab({ networkRefsEnabled, setNetworkRefsEnabled, networkRefsCust
           <div className="space-y-2">
             <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-2 items-end">
               <div>
-                <label className="block text-xs font-mono uppercase tracking-wider mb-1" style={{ color: t.textMuted }}>
+                <label className="block text-xs wt-mono uppercase tracking-wider mb-1" style={{ color: t.textMuted }}>
                   Label
                 </label>
                 <input
@@ -1538,7 +1532,7 @@ function NetworkTab({ networkRefsEnabled, setNetworkRefsEnabled, networkRefsCust
                 />
               </div>
               <div>
-                <label className="block text-xs font-mono uppercase tracking-wider mb-1" style={{ color: t.textMuted }}>
+                <label className="block text-xs wt-mono uppercase tracking-wider mb-1" style={{ color: t.textMuted }}>
                   Target
                 </label>
                 <input
@@ -1551,7 +1545,7 @@ function NetworkTab({ networkRefsEnabled, setNetworkRefsEnabled, networkRefsCust
                 />
               </div>
               <div>
-                <label className="block text-xs font-mono uppercase tracking-wider mb-1" style={{ color: t.textMuted }}>
+                <label className="block text-xs wt-mono uppercase tracking-wider mb-1" style={{ color: t.textMuted }}>
                   Type
                 </label>
                 <select
@@ -1566,19 +1560,14 @@ function NetworkTab({ networkRefsEnabled, setNetworkRefsEnabled, networkRefsCust
               <div>
                 <button
                   onClick={addCustom}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-mono font-bold transition-all"
-                  style={{
-                    background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                    color:      '#fff',
-                    boxShadow:  '0 2px 8px rgba(59,130,246,0.3)',
-                    whiteSpace: 'nowrap',
-                  }}>
+                  className="wt-btn wt-btn--primary"
+                  style={{ whiteSpace: 'nowrap' }}>
                   <Plus size={12} /> Add
                 </button>
               </div>
             </div>
             {addError && (
-              <div className="flex items-center gap-1.5 text-xs font-mono text-red-400">
+              <div className="flex items-center gap-1.5 text-xs wt-mono" style={{ color: 'var(--wt-down-600)' }}>
                 <AlertCircle size={11} className="shrink-0" />
                 {addError}
               </div>
@@ -1592,7 +1581,7 @@ function NetworkTab({ networkRefsEnabled, setNetworkRefsEnabled, networkRefsCust
 
 // ── API Keys tab ──────────────────────────────────────────────────────────────
 
-function ApiKeysTab({ t, isDark }) {
+function ApiKeysTab({ t }) {
   const [keys,        setKeys]        = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [newName,     setNewName]     = useState('');
@@ -1600,8 +1589,6 @@ function ApiKeysTab({ t, isDark }) {
   const [revealedKey, setRevealedKey] = useState(null); // { id, key, name }
   const [copied,      setCopied]      = useState(false);
   const [error,       setError]       = useState('');
-
-  const rowBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
 
   useEffect(() => {
     fetch('/api/keys')
@@ -1677,25 +1664,28 @@ function ApiKeysTab({ t, isDark }) {
       {/* Revealed key banner */}
       {revealedKey && (
         <div className="rounded-xl border p-4 space-y-3"
-          style={{ borderColor: '#d97706', backgroundColor: isDark ? 'rgba(217,119,6,0.08)' : 'rgba(217,119,6,0.06)' }}>
+          style={{
+            borderColor:     'var(--wt-warn-500)',
+            backgroundColor: 'color-mix(in oklch, var(--wt-warn-500) 7%, transparent)',
+          }}>
           <div className="flex items-center gap-2">
-            <AlertCircle size={13} style={{ color: '#d97706', flexShrink: 0 }} />
-            <span className="text-xs font-mono font-semibold" style={{ color: '#d97706' }}>
+            <AlertCircle size={13} style={{ color: 'var(--wt-warn-600)', flexShrink: 0 }} />
+            <span className="text-xs wt-mono font-semibold" style={{ color: 'var(--wt-warn-600)' }}>
               Copy this key now — it will not be shown again
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <code className="flex-1 text-xs font-mono px-3 py-2 rounded-lg break-all select-all"
-              style={{ backgroundColor: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.06)', color: t.textPrimary }}>
+            <code className="flex-1 text-xs wt-mono px-3 py-2 rounded-lg break-all select-all"
+              style={{ backgroundColor: 'var(--wt-surface-2)', color: t.textPrimary }}>
               {revealedKey.key}
             </code>
             <button
               onClick={copyKey}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-mono font-medium shrink-0 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs wt-mono font-medium shrink-0 transition-colors"
               style={{
-                borderColor:     copied ? '#22c55e' : t.cardBorder,
-                color:           copied ? '#22c55e' : t.textSecondary,
-                backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
+                borderColor:     copied ? 'var(--wt-up-500)' : t.cardBorder,
+                color:           copied ? 'var(--wt-up-600)' : t.textSecondary,
+                backgroundColor: 'var(--wt-surface-2)',
               }}>
               {copied ? <CheckCircle size={12} /> : <Copy size={12} />}
               {copied ? 'Copied' : 'Copy'}
@@ -1703,7 +1693,7 @@ function ApiKeysTab({ t, isDark }) {
           </div>
           <button
             onClick={() => setRevealedKey(null)}
-            className="text-xs font-mono"
+            className="text-xs wt-mono"
             style={{ color: t.textFaint }}>
             Dismiss
           </button>
@@ -1712,8 +1702,8 @@ function ApiKeysTab({ t, isDark }) {
 
       {/* Generate new key */}
       <div className="rounded-xl border overflow-hidden" style={{ borderColor: t.cardBorder }}>
-        <div className="px-5 py-3 border-b" style={{ backgroundColor: rowBg, borderColor: t.cardBorder }}>
-          <div className="text-xs font-mono font-semibold uppercase tracking-wider" style={{ color: t.textSecondary }}>
+        <div className="px-5 py-3 border-b" style={{ backgroundColor: 'var(--wt-surface-2)', borderColor: t.cardBorder }}>
+          <div className="text-xs wt-mono font-semibold uppercase tracking-wider" style={{ color: t.textSecondary }}>
             Generate New Key
           </div>
         </div>
@@ -1724,20 +1714,19 @@ function ApiKeysTab({ t, isDark }) {
               onChange={e => { setNewName(e.target.value); setError(''); }}
               onKeyDown={e => e.key === 'Enter' && generate()}
               placeholder="Key name (e.g. Grafana, Home Assistant)"
-              className="flex-1 rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/60"
-              style={{ backgroundColor: t.inputBg, color: t.textPrimary, borderColor: error ? '#ef4444' : t.cardBorder }}
+              className="flex-1 wt-input wt-mono"
+              style={{ borderColor: error ? 'var(--wt-down-500)' : undefined }}
             />
             <button
               onClick={generate}
               disabled={creating}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-mono font-bold transition-all disabled:opacity-60 shrink-0"
-              style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: '#fff' }}>
+              className="wt-btn wt-btn--primary disabled:opacity-60 shrink-0">
               {creating ? <Loader size={13} className="animate-spin" /> : <Key size={13} />}
               Generate
             </button>
           </div>
           {error && (
-            <div className="flex items-center gap-1.5 text-xs font-mono text-red-400">
+            <div className="flex items-center gap-1.5 text-xs wt-mono" style={{ color: 'var(--wt-down-600)' }}>
               <AlertCircle size={11} className="shrink-0" /> {error}
             </div>
           )}
@@ -1746,18 +1735,18 @@ function ApiKeysTab({ t, isDark }) {
 
       {/* Key list */}
       <div className="rounded-xl border overflow-hidden" style={{ borderColor: t.cardBorder }}>
-        <div className="px-5 py-3 border-b" style={{ backgroundColor: rowBg, borderColor: t.cardBorder }}>
-          <div className="text-xs font-mono font-semibold uppercase tracking-wider" style={{ color: t.textSecondary }}>
+        <div className="px-5 py-3 border-b" style={{ backgroundColor: 'var(--wt-surface-2)', borderColor: t.cardBorder }}>
+          <div className="text-xs wt-mono font-semibold uppercase tracking-wider" style={{ color: t.textSecondary }}>
             Active Keys
           </div>
         </div>
         <div style={{ backgroundColor: t.cardBg }}>
           {loading ? (
-            <div className="px-5 py-4 flex items-center gap-2 text-xs font-mono" style={{ color: t.textFaint }}>
+            <div className="px-5 py-4 flex items-center gap-2 text-xs wt-mono" style={{ color: t.textFaint }}>
               <Loader size={13} className="animate-spin" /> Loading…
             </div>
           ) : keys.length === 0 ? (
-            <div className="px-5 py-4 text-xs font-mono" style={{ color: t.textFaint }}>
+            <div className="px-5 py-4 text-xs wt-mono" style={{ color: t.textFaint }}>
               No API keys yet. Generate one above.
             </div>
           ) : keys.map((k, i) => (
@@ -1767,9 +1756,9 @@ function ApiKeysTab({ t, isDark }) {
               style={{ borderBottom: i < keys.length - 1 ? `1px solid ${t.cardBorder}` : 'none' }}>
               <Key size={13} style={{ color: t.textFaint, flexShrink: 0 }} />
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-mono font-medium" style={{ color: t.textPrimary }}>{k.name}</div>
-                <div className="text-xs font-mono" style={{ color: t.textMuted }}>
-                  <span className="font-mono" style={{ color: t.textFaint }}>{k.key_prefix}…</span>
+                <div className="text-sm wt-mono font-medium" style={{ color: t.textPrimary }}>{k.name}</div>
+                <div className="text-xs wt-mono" style={{ color: t.textMuted }}>
+                  <span className="wt-mono" style={{ color: t.textFaint }}>{k.key_prefix}…</span>
                   {' · '}Created {fmtDate(k.created_at)}
                   {k.last_used_at ? ` · Last used ${fmtDate(k.last_used_at)}` : ' · Never used'}
                 </div>
@@ -1786,7 +1775,7 @@ function ApiKeysTab({ t, isDark }) {
                   onClick={() => revoke(k.id)}
                   title="Revoke key"
                   className="flex items-center justify-center w-7 h-7 rounded-lg border transition-colors"
-                  style={{ borderColor: t.cardBorder, color: '#f87171', backgroundColor: 'transparent' }}>
+                  style={{ borderColor: t.cardBorder, color: 'var(--wt-down-500)', backgroundColor: 'transparent' }}>
                   <Trash2 size={12} />
                 </button>
               </div>
@@ -1797,8 +1786,8 @@ function ApiKeysTab({ t, isDark }) {
 
       {/* Endpoint reference */}
       <div className="rounded-xl border overflow-hidden" style={{ borderColor: t.cardBorder }}>
-        <div className="px-5 py-3 border-b" style={{ backgroundColor: rowBg, borderColor: t.cardBorder }}>
-          <div className="text-xs font-mono font-semibold uppercase tracking-wider" style={{ color: t.textSecondary }}>
+        <div className="px-5 py-3 border-b" style={{ backgroundColor: 'var(--wt-surface-2)', borderColor: t.cardBorder }}>
+          <div className="text-xs wt-mono font-semibold uppercase tracking-wider" style={{ color: t.textSecondary }}>
             API Endpoints
           </div>
         </div>
@@ -1811,19 +1800,23 @@ function ApiKeysTab({ t, isDark }) {
           ].map(({ method, path, desc }) => (
             <div key={path} className="flex items-center gap-3 px-5 py-3"
               style={{ borderColor: t.cardBorder }}>
-              <span className="text-xs font-mono font-bold px-1.5 py-0.5 rounded" style={{ color: '#34d399', backgroundColor: isDark ? 'rgba(52,211,153,0.1)' : 'rgba(52,211,153,0.12)' }}>
+              <span className="text-xs wt-mono font-bold px-1.5 py-0.5 rounded"
+                style={{
+                  color:           'var(--wt-up-600)',
+                  backgroundColor: 'color-mix(in oklch, var(--wt-up-500) 11%, transparent)',
+                }}>
                 {method}
               </span>
-              <code className="text-xs font-mono flex-1 min-w-0 truncate" style={{ color: t.textSecondary }}>
+              <code className="text-xs wt-mono flex-1 min-w-0 truncate" style={{ color: t.textSecondary }}>
                 {path}
               </code>
-              <span className="text-xs font-mono hidden sm:block shrink-0" style={{ color: t.textFaint }}>
+              <span className="text-xs wt-mono hidden sm:block shrink-0" style={{ color: t.textFaint }}>
                 {desc}
               </span>
             </div>
           ))}
         </div>
-        <div className="px-5 py-3 border-t text-xs font-mono" style={{ borderColor: t.cardBorder, color: t.textFaint }}>
+        <div className="px-5 py-3 border-t text-xs wt-mono" style={{ borderColor: t.cardBorder, color: t.textFaint }}>
           Authenticate with <code style={{ color: t.textMuted }}>Authorization: Bearer &lt;key&gt;</code> or <code style={{ color: t.textMuted }}>?api_key=&lt;key&gt;</code>
         </div>
       </div>
@@ -1832,15 +1825,13 @@ function ApiKeysTab({ t, isDark }) {
   );
 }
 
-function PresetSection({ title, presets, enabled, onToggle, t, isDark }) {
-  const rowBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
-
+function PresetSection({ title, presets, enabled, onToggle, t }) {
   return (
     <div className="rounded-xl border overflow-hidden" style={{ borderColor: t.cardBorder }}>
       <div
         className="px-5 py-3 border-b"
-        style={{ backgroundColor: rowBg, borderColor: t.cardBorder }}>
-        <div className="text-xs font-mono font-semibold uppercase tracking-wider" style={{ color: t.textSecondary }}>
+        style={{ backgroundColor: 'var(--wt-surface-2)', borderColor: t.cardBorder }}>
+        <div className="text-xs wt-mono font-semibold uppercase tracking-wider" style={{ color: t.textSecondary }}>
           {title}
         </div>
       </div>
@@ -1858,10 +1849,10 @@ function PresetSection({ title, presets, enabled, onToggle, t, isDark }) {
                 : <Terminal size={13} style={{ color: t.textFaint, flexShrink: 0 }} />
               }
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-mono font-medium" style={{ color: t.textPrimary }}>{preset.label}</div>
-                <div className="text-xs font-mono" style={{ color: t.textMuted }}>{preset.target}</div>
+                <div className="text-sm wt-mono font-medium" style={{ color: t.textPrimary }}>{preset.label}</div>
+                <div className="text-xs wt-mono" style={{ color: t.textMuted }}>{preset.target}</div>
               </div>
-              <Toggle enabled={isOn} onToggle={() => onToggle(preset.target)} isDark={isDark} />
+              <Toggle enabled={isOn} onToggle={() => onToggle(preset.target)} />
             </div>
           );
         })}
