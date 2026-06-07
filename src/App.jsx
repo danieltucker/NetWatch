@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Radio, Activity, AlertTriangle, Bell, Tag as TagIcon, Settings, Code, X, Menu, Search, Zap, ChevronDown, Check } from 'lucide-react';
+import { Plus, Radio, Activity, AlertTriangle, Bell, Tag as TagIcon, Settings, Code, X, Menu, Search, Zap, Calendar } from 'lucide-react';
 import {
   DndContext, closestCenter,
   KeyboardSensor, PointerSensor,
@@ -19,6 +19,7 @@ import { useModuleInstances }  from './hooks/useModuleInstances';
 import { SummaryBar }          from './components/SummaryBar';
 import { ConsolePanel }        from './components/ConsolePanel';
 import { MonitorCard }         from './components/MonitorCard';
+import { StatusDot }           from './components/StatusIndicators';
 import { ModuleCard }          from './components/ModuleCard';
 import { MonitorForm }         from './components/MonitorForm';
 import { ModuleInstanceForm }  from './components/ModuleInstanceForm';
@@ -73,13 +74,6 @@ const SORT_OPTIONS = [
   { label: 'Uptime',  value: 'uptime'  },
   { label: 'Name',    value: 'name'    },
   { label: 'Slowest', value: 'ping'    },
-];
-
-const STATUS_FILTER_OPTS = [
-  { label: 'All',      value: 'all',      dot: null      },
-  { label: 'Down',     value: 'down',     dot: '#ef4444' },
-  { label: 'Degraded', value: 'degraded', dot: '#f59e0b' },
-  { label: 'Up',       value: 'up',       dot: '#4ade80' },
 ];
 
 // ── App ───────────────────────────────────────────────────────────────────────
@@ -209,6 +203,8 @@ export default function App() {
       );
     } else if (statusFilter === 'up') {
       list = list.filter(m => m.status === 'up');
+    } else if (statusFilter === 'pending') {
+      list = list.filter(m => m.status === 'pending');
     }
 
     // Sort
@@ -304,16 +300,25 @@ export default function App() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  // Sidebar status rows with live counts from user monitors
+  const statusRows = [
+    { label: 'All',      value: 'all',      status: null,       count: userMonitors.length },
+    { label: 'Up',       value: 'up',       status: 'up',       count: userMonitors.filter(m => m.status === 'up').length },
+    { label: 'Degraded', value: 'degraded', status: 'degraded', count: userMonitors.filter(m => m.status === 'degraded' || (m.status === 'up' && m.degradedThreshold != null && m.currentPing != null && m.currentPing > m.degradedThreshold)).length },
+    { label: 'Down',     value: 'down',     status: 'down',     count: userMonitors.filter(m => m.status === 'down').length },
+    { label: 'Paused',   value: 'pending',  status: 'pending',  count: userMonitors.filter(m => m.status === 'pending').length },
+  ];
+
   return (
-    <div className="min-h-screen" style={{ backgroundColor: t.pageBg, color: t.textPrimary }}>
+    <div className="app">
 
       {/* ── Console (always mounted, toggled with `) ─────────────────────────── */}
       <ConsolePanel monitors={monitors} onRefresh={refresh} />
 
       {/* ── Page-level error toast ───────────────────────────────────────────── */}
       {pageError && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 px-4 py-3 rounded-xl border text-xs font-mono text-red-400 shadow-lg"
-          style={{ backgroundColor: '#1e0a0a', borderColor: '#7f1d1d', maxWidth: '480px' }}>
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 px-4 py-3 rounded-xl border text-xs wt-mono shadow-lg"
+          style={{ backgroundColor: 'var(--wt-down-50)', borderColor: 'color-mix(in oklch, var(--wt-down-500) 40%, transparent)', color: 'var(--wt-down-600)', maxWidth: '480px' }}>
           <AlertTriangle size={13} className="shrink-0" />
           <span className="flex-1">{pageError}</span>
           <button onClick={() => setPageError('')} className="opacity-60 hover:opacity-100 ml-1">
@@ -322,139 +327,112 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Top nav ─────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 border-b"
-        style={{ backgroundColor: t.headerBg, borderColor: t.cardBorder }}>
-        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+      {/* ── Topbar ── */}
+      <div className="app__top">
+        <span className="wt-appicon" style={{ '--ai-size': '30px', '--ai-from': 'var(--nw-from)', '--ai-to': 'var(--nw-to)' }}>
+          <Radio />
+        </span>
+        <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em', color: 'var(--wt-text)' }}>
+          Net<span style={{ color: 'var(--nw-ink)' }}>Watch</span>
+        </span>
+        <span className="wt-chip wt-chip--plain">v6.6.0</span>
 
-          {/* Logo */}
-          <div className="flex items-center gap-3">
-            <Radio size={18} className="text-green-400" />
-            <span className="font-mono font-bold tracking-[0.12em]" style={{ color: t.textPrimary }}>
-              NETWATCH
+        <div className="flex items-center gap-2" style={{ marginLeft: 'auto' }}>
+          {/* live indicator */}
+          <div className="hidden sm:flex items-center gap-1.5 mr-1">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full" style={{ backgroundColor: 'var(--wt-up-500)', opacity: 0.5 }} />
+              <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: 'var(--wt-up-500)' }} />
             </span>
-            <span className="hidden sm:inline text-xs font-mono px-2 py-0.5 rounded border"
-              style={{ color: t.textFaint, borderColor: t.cardBorder }}>
-              netwatch · v6.5.2
-            </span>
+            <span className="wt-mono text-xs" style={{ color: 'var(--wt-text-faint)' }}>live</span>
           </div>
 
-          {/* Right controls */}
-          <div className="flex items-center gap-3">
+          {/* search — desktop */}
+          <div className="hidden sm:block"><MonitorSearch value={searchQuery} onChange={setSearchQuery} t={t} /></div>
 
-            {/* SSE live indicator — desktop only */}
-            <div className="hidden sm:flex items-center gap-1.5">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-50" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-              </span>
-              <span className="text-xs font-mono" style={{ color: t.textFaint }}>live</span>
-            </div>
-
-            {/* Desktop icon buttons */}
-            <div className="hidden sm:flex items-center gap-3">
-              {/* Alerts bell */}
-              <button onClick={() => setShowAlerts(p => !p)}
-                className="relative p-1.5 rounded transition-colors"
-                style={{ color: ongoingCount > 0 ? '#f87171' : t.textMuted }}
-                title="Alerts">
-                <Bell size={16} />
-                {ongoingCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-red-500 flex items-center justify-center text-white font-bold"
-                    style={{ fontSize: 9 }}>
-                    {ongoingCount}
-                  </span>
-                )}
-              </button>
-
-              {/* Embed full dashboard */}
-              <button onClick={() => setEmbedMonitor(undefined)}
-                className="p-1.5 rounded transition-colors"
-                style={{ color: t.textMuted }}
-                title="Embed dashboard">
-                <Code size={16} />
-              </button>
-
-              {/* Settings */}
-              <button onClick={() => setShowSettings(true)}
-                className="p-1.5 rounded transition-colors"
-                style={{ color: t.textMuted }}
-                title="Settings">
-                <Settings size={16} />
-              </button>
-
-              {/* Add monitor / module */}
-              <button onClick={openAdd}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono font-bold rounded transition-colors">
-                <Plus size={14} />
-                Add
-              </button>
-            </div>
-
-            {/* Mobile: alerts badge + hamburger */}
-            <div className="flex sm:hidden items-center gap-2">
-              {/* Alerts bell visible on mobile so badge is always accessible */}
-              <button onClick={() => setShowAlerts(p => !p)}
-                className="relative p-1.5 rounded transition-colors"
-                style={{ color: ongoingCount > 0 ? '#f87171' : t.textMuted }}
-                title="Alerts">
-                <Bell size={16} />
-                {ongoingCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-red-500 flex items-center justify-center text-white font-bold"
-                    style={{ fontSize: 9 }}>
-                    {ongoingCount}
-                  </span>
-                )}
-              </button>
-
-              <button onClick={() => setMobileMenuOpen(p => !p)}
-                className="p-1.5 rounded transition-colors"
-                style={{ color: t.textMuted }}
-                title="Menu">
-                {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
-              </button>
-            </div>
+          {/* ghost icon buttons — desktop */}
+          <div className="hidden sm:flex items-center gap-1">
+            <button onClick={() => setShowAlerts(p => !p)} className="wt-btn wt-btn--ghost wt-btn--sm relative" title="Alerts"
+              style={ongoingCount > 0 ? { color: 'var(--wt-down-600)' } : undefined}>
+              <Bell size={16} />
+              {ongoingCount > 0 && (
+                <span className="wt-mono absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: 'var(--wt-down-500)', color: '#fff', fontSize: 9, fontWeight: 700 }}>{ongoingCount}</span>
+              )}
+            </button>
+            <button onClick={() => setEmbedMonitor(undefined)} className="wt-btn wt-btn--ghost wt-btn--sm" title="Embed dashboard"><Code size={16} /></button>
+            <button onClick={() => setShowSettings(true)} className="wt-btn wt-btn--ghost wt-btn--sm" title="Settings"><Settings size={16} /></button>
           </div>
+
+          <button onClick={openAdd} className="hidden sm:inline-flex wt-btn wt-btn--primary"><Plus size={15} />Add monitor</button>
+
+          {/* mobile: alerts + hamburger */}
+          <button onClick={() => setShowAlerts(p => !p)} className="sm:hidden wt-btn wt-btn--ghost wt-btn--sm relative" title="Alerts"
+            style={ongoingCount > 0 ? { color: 'var(--wt-down-600)' } : undefined}>
+            <Bell size={16} />
+            {ongoingCount > 0 && (
+              <span className="wt-mono absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: 'var(--wt-down-500)', color: '#fff', fontSize: 9, fontWeight: 700 }}>{ongoingCount}</span>
+            )}
+          </button>
+          <button onClick={() => setMobileMenuOpen(p => !p)} className="sm:hidden wt-btn wt-btn--ghost wt-btn--sm" title="Menu">
+            {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Sidebar ── */}
+      <aside className={`app__side ${mobileMenuOpen ? 'is-open' : ''}`}>
+        {/* mobile-only quick actions */}
+        <div className="sm:hidden flex items-center gap-2 mb-3">
+          <button onClick={() => { openAdd(); setMobileMenuOpen(false); }} className="wt-btn wt-btn--primary wt-btn--sm"><Plus size={14} />Add</button>
+          <button onClick={() => { setEmbedMonitor(undefined); setMobileMenuOpen(false); }} className="wt-btn wt-btn--ghost wt-btn--sm" title="Embed"><Code size={14} /></button>
+          <button onClick={() => { setShowSettings(true); setMobileMenuOpen(false); }} className="wt-btn wt-btn--ghost wt-btn--sm" title="Settings"><Settings size={14} /></button>
         </div>
 
-        {/* Mobile dropdown menu */}
-        {mobileMenuOpen && (
-          <div className="sm:hidden border-t px-4 py-3 space-y-3"
-            style={{ borderColor: t.cardBorder, backgroundColor: t.headerBg }}>
+        {/* STATUS */}
+        <div className="side__group">Status</div>
+        {statusRows.map(row => (
+          <button key={row.value} className={`side__item ${statusFilter === row.value ? 'is-active' : ''}`}
+            onClick={() => { setStatusFilter(row.value); setMobileMenuOpen(false); }}>
+            {row.status ? <StatusDot status={row.status} /> : <span style={{ width: 7, height: 7 }} />}
+            <span>{row.label}</span>
+            <span className="side__item__count">{row.count}</span>
+          </button>
+        ))}
 
-            {/* Action buttons row */}
-            <div className="flex items-center gap-2">
-              <button onClick={() => { setEmbedMonitor(undefined); setMobileMenuOpen(false); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono border transition-colors"
-                style={{ color: t.textMuted, borderColor: t.cardBorder, backgroundColor: t.inputBg }}>
-                <Code size={13} />
-                Embed
-              </button>
-
-              <button onClick={() => { setShowSettings(true); setMobileMenuOpen(false); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono border transition-colors"
-                style={{ color: t.textMuted, borderColor: t.cardBorder, backgroundColor: t.inputBg }}>
-                <Settings size={13} />
-                Settings
-              </button>
-
-              <button onClick={() => { openAdd(); setMobileMenuOpen(false); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono font-bold rounded transition-colors ml-auto">
-                <Plus size={13} />
-                Add
-              </button>
+        {/* TAGS */}
+        {allTags.length > 0 && (
+          <>
+            <div className="side__group flex items-center justify-between">
+              <span>Tags</span>
+              {tagFilter.length > 0 && (
+                <button onClick={() => setTagFilter([])} className="wt-btn wt-btn--ghost wt-btn--sm" style={{ padding: '0 4px' }}>clear</button>
+              )}
             </div>
-          </div>
+            {allTags.map(tag => (
+              <button key={tag} className={`side__item ${tagFilter.includes(tag) ? 'is-active' : ''}`} onClick={() => toggleTag(tag)}>
+                <TagIcon size={12} />
+                <span className="truncate">{tag}</span>
+                <span className="side__item__count">{userMonitors.filter(m => m.tags?.includes(tag)).length}</span>
+              </button>
+            ))}
+          </>
         )}
-      </header>
 
-      {/* ── Summary strip ───────────────────────────────────────────────────── */}
-      {!loading && !error && userMonitors.length > 0 && (
-        <SummaryBar monitors={userMonitors} />
-      )}
+        {/* SORT */}
+        <div className="side__group">Sort</div>
+        <select className="wt-select" value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ fontSize: 13 }}>
+          {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
 
-      {/* ── Main ────────────────────────────────────────────────────────────── */}
-      <main className="max-w-7xl mx-auto px-6 py-6 space-y-5">
+        {/* HISTORY */}
+        <div className="side__group">History</div>
+        <HistoryRangeControl historyRange={historyRange} onChange={setHistoryRange} t={t} isDark={isDark} />
+      </aside>
+
+      {/* ── Main ── */}
+      <main className="app__main">
 
         {/* Alerts panel */}
         {showAlerts && (
@@ -471,76 +449,18 @@ export default function App() {
 
         {!loading && !error && (
           <>
+            {userMonitors.length > 0 && <SummaryBar monitors={userMonitors} />}
 
-            {/* ── Tag filter row (only shown when tags exist) ──────────────── */}
-            {allTags.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-mono uppercase tracking-wider"
-                  style={{ color: t.textMuted }}>
-                  Filter
-                </span>
-                {allTags.map(tag => (
-                  <button key={tag} onClick={() => toggleTag(tag)}
-                    className="flex items-center gap-0.5 text-xs font-mono px-2 py-0.5 rounded border transition-colors"
-                    style={tagFilter.includes(tag)
-                      ? { color: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.15)', borderColor: 'rgba(96,165,250,0.4)' }
-                      : { color: t.textMuted, backgroundColor: t.tagBg, borderColor: t.tagBorder }
-                    }>
-                    <TagIcon size={9} />
-                    {tag}
-                  </button>
-                ))}
-                {tagFilter.length > 0 && (
-                  <button onClick={() => setTagFilter([])}
-                    className="text-xs font-mono transition-opacity opacity-50 hover:opacity-100"
-                    style={{ color: t.textSecondary }}>
-                    clear
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* ── Controls row ─────────────────────────────────────────────── */}
-            <div className="flex items-center gap-2 flex-wrap">
-
-              {/* Text search */}
-              <MonitorSearch value={searchQuery} onChange={setSearchQuery} t={t} />
-
-              {/* Status quick-filter */}
-              <StatusFilterGroup value={statusFilter} onChange={setStatusFilter} t={t} isDark={isDark} />
-
-              {/* Divider */}
-              <div className="w-px h-3 shrink-0 hidden sm:block" style={{ backgroundColor: t.cardBorder }} />
-
-              {/* History range (pills or active-range badge) */}
-              <HistoryRangeControl
-                historyRange={historyRange}
-                onChange={setHistoryRange}
-                t={t}
-                isDark={isDark}
-              />
-
-              {/* Sort — pushed to the right on wide screens */}
-              <div className="flex items-center gap-1 ml-auto">
-                <span className="text-xs font-mono" style={{ color: t.textFaint }}>Sort</span>
-                <select
-                  value={sortBy}
-                  onChange={e => setSortBy(e.target.value)}
-                  className="text-xs font-mono rounded border px-1.5 py-0.5 appearance-none cursor-pointer focus:outline-none"
-                  style={{ backgroundColor: t.inputBg, color: t.textSecondary, borderColor: t.cardBorder }}>
-                  {SORT_OPTIONS.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            {/* ── Monitors ── */}
+            <section>
+              <div className="section-head"><span className="wt-eyebrow">Monitors</span></div>
 
             {/* Monitor grid */}
             {userMonitors.length === 0 ? (
               <EmptyState onAdd={openAdd} t={t} />
             ) : filteredMonitors.length === 0 ? (
-              <div className="py-12 text-center text-xs font-mono" style={{ color: t.textMuted }}>
-                No monitors match the selected tags
+              <div className="py-12 text-center text-xs" style={{ color: t.textMuted }}>
+                No monitors match the selected filters
               </div>
             ) : (
               <DndContext
@@ -568,49 +488,26 @@ export default function App() {
               </DndContext>
             )}
 
-            {/* ── Module instances ──────────────────────────────────────── */}
+            </section>
+
+            {/* ── Module instances ── */}
             {instances.length > 0 && (
-              <section>
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="h-px flex-1" style={{ backgroundColor: t.cardBorder }} />
-                  <span className="text-xs font-mono uppercase tracking-widest px-1"
-                    style={{ color: t.textFaint }}>
-                    Modules
-                  </span>
-                  <div className="h-px flex-1" style={{ backgroundColor: t.cardBorder }} />
-                </div>
+              <section className="mt-6">
+                <div className="section-head"><span className="wt-eyebrow">Modules</span></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {instances.filter(i => i.enabled).map(inst => (
-                    <ModuleCard
-                      key={inst.id}
-                      instance={inst}
-                      onEdit={setEditingInstance}
-                      onDelete={deleteInstance}
-                    />
+                    <ModuleCard key={inst.id} instance={inst} onEdit={setEditingInstance} onDelete={deleteInstance} />
                   ))}
                 </div>
               </section>
             )}
 
-            {/* ── Network Reference section ──────────────────────────────── */}
+            {/* ── Network Reference ── */}
             {refMonitors.length > 0 && (
-              <section>
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="h-px flex-1" style={{ backgroundColor: t.cardBorder }} />
-                  <span className="text-xs font-mono uppercase tracking-widest px-1"
-                    style={{ color: t.textFaint }}>
-                    Network Reference
-                  </span>
-                  <div className="h-px flex-1" style={{ backgroundColor: t.cardBorder }} />
-                </div>
+              <section className="mt-6">
+                <div className="section-head"><span className="wt-eyebrow">Reference</span></div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {refMonitors.map(m => (
-                    <MonitorCard
-                      key={m.id}
-                      monitor={m}
-                      compact
-                    />
-                  ))}
+                  {refMonitors.map(m => <MonitorCard key={m.id} monitor={m} compact />)}
                 </div>
               </section>
             )}
@@ -695,7 +592,7 @@ export default function App() {
 
 // ── Toolbar sub-components ────────────────────────────────────────────────────
 
-function MonitorSearch({ value, onChange, t }) {
+function MonitorSearch({ value, onChange }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -710,234 +607,118 @@ function MonitorSearch({ value, onChange, t }) {
   }, [onChange]);
 
   return (
-    <div className="relative flex items-center shrink-0">
-      <Search size={11} className="absolute left-2 pointer-events-none"
-        style={{ color: t.textFaint }} />
+    <div className="relative flex items-center" style={{ width: 240 }}>
+      <Search size={13} className="absolute left-2.5 pointer-events-none" style={{ color: 'var(--wt-text-faint)' }} />
       <input
         ref={ref}
         type="text"
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder="Search monitors…"
-        className="pl-6 py-0.5 text-xs font-mono rounded border focus:outline-none
-                   focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 transition-all"
-        style={{
-          width:           value ? 160 : 140,
-          paddingRight:    value ? '1.25rem' : '0.5rem',
-          backgroundColor: t.inputBg,
-          color:           t.textPrimary,
-          borderColor:     value ? 'rgba(96,165,250,0.5)' : t.cardBorder,
-          transition:      'width 0.15s, border-color 0.15s',
-        }}
+        className="wt-input"
+        style={{ paddingLeft: 30, paddingRight: value ? 28 : 12, height: 32 }}
       />
       {value && (
-        <button
-          onClick={() => onChange('')}
-          className="absolute right-1.5 opacity-50 hover:opacity-100 transition-opacity"
-          style={{ color: t.textMuted }}
-          title="Clear (Esc)">
-          <X size={10} />
+        <button onClick={() => onChange('')}
+          className="absolute right-2 opacity-50 hover:opacity-100 transition-opacity"
+          style={{ color: 'var(--wt-text-muted)' }} title="Clear (Esc)">
+          <X size={12} />
         </button>
       )}
     </div>
   );
 }
 
-function StatusFilterGroup({ value, onChange, t, isDark }) {
-  return (
-    <div className="flex items-center shrink-0">
-      {STATUS_FILTER_OPTS.map((opt, i) => {
-        const isActive = value === opt.value;
-        const isFirst  = i === 0;
-        const isLast   = i === STATUS_FILTER_OPTS.length - 1;
-        const color    = opt.dot ?? '#60a5fa';
-        return (
-          <button
-            key={opt.value}
-            onClick={() => onChange(opt.value)}
-            className="flex items-center gap-1 px-2 py-0.5 text-xs font-mono border transition-all"
-            style={{
-              borderRadius:    isFirst ? '0.375rem 0 0 0.375rem'
-                             : isLast  ? '0 0.375rem 0.375rem 0' : '0',
-              marginLeft:      i > 0 ? '-1px' : 0,
-              position:        'relative',
-              zIndex:          isActive ? 1 : 0,
-              backgroundColor: isActive
-                ? `${color}18`
-                : isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-              borderColor:     isActive ? color : t.cardBorder,
-              color:           isActive ? color : t.textMuted,
-            }}>
-            {opt.dot && (
-              <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
-                style={{ backgroundColor: opt.dot, opacity: isActive ? 1 : 0.45 }} />
-            )}
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-const PRESET_LABELS = {
-  '15m': 'Last 15 Minutes',
-  '1h':  'Last 1 Hour',
-  '6h':  'Last 6 Hours',
-  '12h': 'Last 12 Hours',
-  '1d':  'Last 24 Hours',
-  '1w':  'Last 7 Days',
-  '30d': 'Last 30 Days',
-};
+// History windows surfaced as a 5-option segmented control (+ custom range).
+const SEG_WINDOWS = [
+  { label: '1H',  value: '1h'  },
+  { label: '6H',  value: '6h'  },
+  { label: '24H', value: '1d'  },
+  { label: '7D',  value: '1w'  },
+  { label: '30D', value: '30d' },
+];
 
 function HistoryRangeControl({ historyRange, onChange, t, isDark }) {
-  const [menuOpen,       setMenuOpen]       = useState(false);
-  const [customExpanded, setCustomExpanded] = useState(false);
-  const [draftFrom,      setDraftFrom]      = useState('');
-  const [draftTo,        setDraftTo]        = useState('');
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [draftFrom,  setDraftFrom]  = useState('');
+  const [draftTo,    setDraftTo]    = useState('');
   const wrapRef = useRef(null);
 
   useEffect(() => {
-    if (!menuOpen) return;
-    const onMouse = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
-        setMenuOpen(false); setCustomExpanded(false);
-      }
-    };
-    const onKey = (e) => {
-      if (e.key === 'Escape') { setMenuOpen(false); setCustomExpanded(false); }
-    };
+    if (!pickerOpen) return;
+    const onMouse = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setPickerOpen(false); };
+    const onKey   = (e) => { if (e.key === 'Escape') setPickerOpen(false); };
     document.addEventListener('mousedown', onMouse);
     document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onMouse);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [menuOpen]);
+    return () => { document.removeEventListener('mousedown', onMouse); document.removeEventListener('keydown', onKey); };
+  }, [pickerOpen]);
 
   const isRangeActive = historyRange.type === 'custom' || historyRange.type === 'zoom';
   const isZoom        = historyRange.type === 'zoom';
+  const activeValue   = historyRange.type === 'preset' ? historyRange.value : null;
 
-  const clearRange   = () => { onChange({ type: 'preset', value: '1h' }); setMenuOpen(false); setCustomExpanded(false); };
-  const selectPreset = (value) => { onChange({ type: 'preset', value }); setMenuOpen(false); setCustomExpanded(false); };
-
-  const applyCustom = () => {
+  const selectPreset = (value) => { onChange({ type: 'preset', value }); setPickerOpen(false); };
+  const clearRange   = () => { onChange({ type: 'preset', value: '1h' }); setPickerOpen(false); };
+  const applyCustom  = () => {
     if (!draftFrom || !draftTo) return;
     onChange({ type: 'custom', from: new Date(draftFrom).toISOString(), to: new Date(draftTo).toISOString() });
-    setMenuOpen(false); setCustomExpanded(false);
+    setPickerOpen(false);
   };
 
-  const getTriggerLabel = () => {
-    if (historyRange.type === 'preset') return PRESET_LABELS[historyRange.value] ?? historyRange.value;
-    if (historyRange.type === 'zoom') {
-      const s = new Date(historyRange.incidentAt).toLocaleString('en-US', {
-        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
-      });
+  const rangeSummary = () => {
+    if (isZoom) {
+      const s = new Date(historyRange.incidentAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
       return `${s} ±30m`;
     }
-    const from = new Date(historyRange.from);
-    const to   = new Date(historyRange.to);
-    const fStr = from.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
-    const tStr = from.toDateString() === to.toDateString()
+    const from = new Date(historyRange.from), to = new Date(historyRange.to);
+    const f = from.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+    const tt = from.toDateString() === to.toDateString()
       ? to.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
       : to.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
-    return `${fStr} – ${tStr}`;
+    return `${f} – ${tt}`;
   };
 
-  const triggerActive = isRangeActive || menuOpen;
-  const accentColor  = isZoom ? '#f59e0b' : '#60a5fa';
-  const accentBorder = isZoom ? 'rgba(245,158,11,0.35)' : '#60a5fa';
-  const accentBg     = isZoom ? 'rgba(245,158,11,0.12)' : (isDark ? 'rgba(96,165,250,0.12)' : 'rgba(59,130,246,0.08)');
-
   return (
-    <div className="relative flex items-center gap-1 shrink-0" ref={wrapRef}>
-      <span className="text-xs font-mono" style={{ color: t.textFaint }}>History</span>
+    <div className="relative" ref={wrapRef}>
+      <div className="flex items-center gap-1">
+        <div className="wt-seg" style={{ flex: 1 }}>
+          {SEG_WINDOWS.map(w => (
+            <button key={w.value} aria-selected={activeValue === w.value} onClick={() => selectPreset(w.value)}>
+              {w.label}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setPickerOpen(p => !p)} className="wt-btn wt-btn--ghost wt-btn--sm" title="Custom range"
+          style={isRangeActive ? { color: 'var(--nw-ink)', background: 'color-mix(in oklch, var(--nw-ink) 12%, transparent)' } : undefined}>
+          <Calendar size={14} />
+        </button>
+      </div>
 
-      {/* Trigger button */}
-      <button
-        onClick={() => setMenuOpen(p => !p)}
-        className="h-7 px-3 text-xs font-mono rounded-lg border transition-colors flex items-center gap-1.5 max-w-[220px]"
-        style={{
-          backgroundColor: triggerActive ? accentBg     : t.cardBg,
-          borderColor:     triggerActive ? accentBorder : t.cardBorder,
-          color:           triggerActive ? accentColor  : t.textSecondary,
-        }}>
-        {isZoom && <Zap size={10} />}
-        <span className="truncate">{getTriggerLabel()}</span>
-        {isRangeActive ? (
-          <span role="button" title="Clear range"
-            onClick={e => { e.stopPropagation(); clearRange(); }}
-            className="opacity-60 hover:opacity-100 transition-opacity shrink-0">
-            <X size={10} />
-          </span>
-        ) : (
-          <ChevronDown size={12} className="shrink-0" style={{ transform: menuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
-        )}
-      </button>
+      {isRangeActive && (
+        <div className="mt-1.5 flex items-center gap-1.5 wt-mono text-xs" style={{ color: isZoom ? 'var(--wt-warn-600)' : 'var(--nw-ink)' }}>
+          {isZoom && <Zap size={10} />}
+          <span className="truncate">{rangeSummary()}</span>
+          <button onClick={clearRange} className="opacity-60 hover:opacity-100 shrink-0" title="Clear range"><X size={10} /></button>
+        </div>
+      )}
 
-      {/* Dropdown menu */}
-      {menuOpen && (
-        <div className="absolute top-full mt-1 right-0 z-30 rounded-lg border shadow-2xl py-1"
-          style={{
-            backgroundColor: t.cardBg,
-            borderColor:     t.cardBorder,
-            minWidth:        192,
-            boxShadow: isDark
-              ? '0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)'
-              : '0 16px 48px rgba(0,0,0,0.15)',
-          }}>
-
-          {/* Preset items */}
-          {Object.entries(PRESET_LABELS).map(([value, label]) => {
-            const isActive = historyRange.type === 'preset' && historyRange.value === value;
-            return (
-              <button key={value} onClick={() => selectPreset(value)}
-                className="w-full px-3 py-1.5 text-xs font-mono flex items-center justify-between transition-colors text-left"
-                style={{ color: isActive ? '#60a5fa' : t.textSecondary, backgroundColor: 'transparent' }}
-                onMouseEnter={e => { e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'; }}
-                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}>
-                <span>{label}</span>
-                {isActive && <Check size={11} style={{ color: '#60a5fa' }} />}
-              </button>
-            );
-          })}
-
-          {/* Divider */}
-          <div className="my-1 border-t" style={{ borderColor: t.metricGap }} />
-
-          {/* Custom Range toggle */}
-          <button
-            onClick={() => setCustomExpanded(p => !p)}
-            className="w-full px-3 py-1.5 text-xs font-mono flex items-center justify-between transition-colors text-left"
-            style={{ color: t.textMuted, backgroundColor: 'transparent' }}
-            onMouseEnter={e => { e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'; }}
-            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}>
-            <span>Custom Range…</span>
-            <ChevronDown size={11} style={{ transform: customExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+      {pickerOpen && (
+        <div className="absolute top-full left-0 mt-1.5 z-30 rounded-lg border shadow-2xl p-3 space-y-2"
+          style={{ backgroundColor: t.cardBg, borderColor: t.cardBorder, minWidth: 240,
+            boxShadow: isDark ? '0 16px 48px rgba(0,0,0,0.6)' : '0 16px 48px rgba(0,0,0,0.15)' }}>
+          <div className="wt-eyebrow">Custom range</div>
+          <div className="wt-field">
+            <label className="wt-label" style={{ fontSize: 11 }}>From</label>
+            <input type="datetime-local" className="wt-input wt-input--mono" value={draftFrom} onChange={e => setDraftFrom(e.target.value)} />
+          </div>
+          <div className="wt-field">
+            <label className="wt-label" style={{ fontSize: 11 }}>To</label>
+            <input type="datetime-local" className="wt-input wt-input--mono" value={draftTo} onChange={e => setDraftTo(e.target.value)} />
+          </div>
+          <button onClick={applyCustom} disabled={!draftFrom || !draftTo} className="wt-btn wt-btn--primary"
+            style={{ width: '100%', justifyContent: 'center', opacity: (!draftFrom || !draftTo) ? 0.4 : 1 }}>
+            Apply range
           </button>
-
-          {/* Inline custom date inputs */}
-          {customExpanded && (
-            <div className="px-3 pb-2 pt-1 space-y-2">
-              <div>
-                <div className="text-[10px] font-mono uppercase tracking-wider mb-1" style={{ color: t.textFaint }}>From</div>
-                <input type="datetime-local" value={draftFrom} onChange={e => setDraftFrom(e.target.value)}
-                  className="w-full rounded border px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 transition-all"
-                  style={{ backgroundColor: t.inputBg, color: t.textPrimary, borderColor: t.cardBorder }} />
-              </div>
-              <div>
-                <div className="text-[10px] font-mono uppercase tracking-wider mb-1" style={{ color: t.textFaint }}>To</div>
-                <input type="datetime-local" value={draftTo} onChange={e => setDraftTo(e.target.value)}
-                  className="w-full rounded border px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 transition-all"
-                  style={{ backgroundColor: t.inputBg, color: t.textPrimary, borderColor: t.cardBorder }} />
-              </div>
-              <button onClick={applyCustom} disabled={!draftFrom || !draftTo}
-                className="w-full px-3 py-1.5 rounded text-xs font-mono font-bold transition-all disabled:opacity-40"
-                style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: '#fff', boxShadow: '0 2px 8px rgba(59,130,246,0.35)' }}>
-                Apply Range
-              </button>
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -948,7 +729,7 @@ function HistoryRangeControl({ historyRange, onChange, t, isDark }) {
 
 function LoadingState({ t }) {
   return (
-    <div className="flex items-center justify-center py-36 gap-3 font-mono text-sm"
+    <div className="flex items-center justify-center py-36 gap-3 text-sm"
       style={{ color: t.textMuted }}>
       <span className="animate-spin">⟳</span> Connecting to server…
     </div>
@@ -958,12 +739,12 @@ function LoadingState({ t }) {
 function ErrorState({ message, t }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-3">
-      <AlertTriangle size={36} className="text-red-500/60" />
-      <p className="font-mono text-sm text-red-400">Cannot reach the NetWatch server</p>
-      <p className="font-mono text-xs" style={{ color: t.textMuted }}>{message}</p>
-      <p className="font-mono text-xs mt-2" style={{ color: t.textFaint }}>
-        Run <span style={{ color: t.textSecondary }}>npm run dev</span> inside{' '}
-        <span style={{ color: t.textSecondary }}>server/</span> to start the backend.
+      <AlertTriangle size={36} style={{ color: 'color-mix(in oklch, var(--wt-down-500) 60%, transparent)' }} />
+      <p className="text-sm font-semibold" style={{ color: 'var(--wt-down-600)' }}>Cannot reach the NetWatch server</p>
+      <p className="wt-mono text-xs" style={{ color: t.textMuted }}>{message}</p>
+      <p className="text-xs mt-2" style={{ color: t.textFaint }}>
+        Run <span className="wt-mono" style={{ color: t.textSecondary }}>npm run dev</span> inside{' '}
+        <span className="wt-mono" style={{ color: t.textSecondary }}>server/</span> to start the backend.
       </p>
     </div>
   );
@@ -975,17 +756,15 @@ function EmptyState({ onAdd, t }) {
       <div className="relative mb-6">
         <Activity size={52} style={{ color: t.textFaint }} />
         <span className="absolute -top-1 -right-1 flex h-3 w-3">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-40" />
-          <span className="relative inline-flex rounded-full h-3 w-3 bg-green-600" />
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full" style={{ backgroundColor: 'var(--wt-up-500)', opacity: 0.4 }} />
+          <span className="relative inline-flex rounded-full h-3 w-3" style={{ backgroundColor: 'var(--wt-up-600)' }} />
         </span>
       </div>
-      <p className="font-mono text-sm mb-1" style={{ color: t.textMuted }}>No monitors configured</p>
-      <p className="font-mono text-xs" style={{ color: t.textFaint }}>
+      <p className="text-sm mb-1" style={{ color: t.textMuted }}>No monitors configured</p>
+      <p className="text-xs" style={{ color: t.textFaint }}>
         Add an IP or domain to start tracking uptime
       </p>
-      <button onClick={onAdd}
-        className="mt-8 flex items-center gap-2 px-4 py-2.5 text-sm font-mono rounded border transition-colors hover:opacity-80"
-        style={{ backgroundColor: t.tagBg, color: t.textSecondary, borderColor: t.tagBorder }}>
+      <button onClick={onAdd} className="wt-btn wt-btn--primary mt-8">
         <Plus size={15} />
         Add your first monitor
       </button>

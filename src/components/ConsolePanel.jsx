@@ -35,17 +35,17 @@ const MAX_USAGE = Math.max(...Object.values(CMDS).map(c => c.usage.length));
 // ---------------------------------------------------------------------------
 
 const LINE_COLORS = {
-  command: '#e6edf3',
-  output:  '#8d96a0',
-  success: '#4ade80',
-  error:   '#f87171',
-  info:    '#60a5fa',
-  warn:    '#fbbf24',
+  command: 'var(--wt-console-text)',
+  output:  'var(--wt-console-muted)',
+  success: 'var(--wt-up-500)',
+  error:   'var(--wt-down-500)',
+  info:    'var(--wt-console-accent)',
+  warn:    'var(--wt-warn-500)',
 };
 
 function ConsoleLine({ type, text }) {
   if (type === 'divider') {
-    return <div style={{ borderTop: '1px solid #21262d', margin: '3px 0' }} />;
+    return <div style={{ borderTop: '1px solid var(--wt-console-border)', margin: '3px 0' }} />;
   }
   return (
     <div style={{
@@ -57,7 +57,7 @@ function ConsoleLine({ type, text }) {
       gap:         8,
     }}>
       {type === 'command' && (
-        <span style={{ color: '#4ade80', userSelect: 'none', flexShrink: 0 }}>$</span>
+        <span style={{ color: 'var(--wt-console-prompt)', userSelect: 'none', flexShrink: 0 }}>$</span>
       )}
       <span>{text}</span>
     </div>
@@ -218,7 +218,7 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
 
         // ── version ──────────────────────────────────────────────────────
         case 'version':
-          emit({ type: 'output', text: 'NetWatch v6.5.2' });
+          emit({ type: 'output', text: 'NetWatch v6.6.0' });
           break;
 
         // ── help ─────────────────────────────────────────────────────────
@@ -599,10 +599,10 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
       height:           '55vh',
       display:          'flex',
       flexDirection:    'column',
-      fontFamily:       '"JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace',
+      fontFamily:       'var(--wt-font-mono)',
       fontSize:          13,
-      backgroundColor: '#0a0c0f',
-      borderBottom:    '1px solid #21262d',
+      backgroundColor: 'var(--wt-console-bg)',
+      borderBottom:    '1px solid var(--wt-console-border)',
       boxShadow:       isOpen ? '0 8px 40px rgba(0,0,0,0.7)' : 'none',
       transform:        isOpen ? 'translateY(0)' : 'translateY(-100%)',
       transition:       'transform 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -615,14 +615,14 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
         alignItems:      'center',
         justifyContent:  'space-between',
         padding:         '5px 16px',
-        backgroundColor: '#111318',
-        borderBottom:    '1px solid #21262d',
+        backgroundColor: 'var(--wt-console-bg-2)',
+        borderBottom:    '1px solid var(--wt-console-border)',
         flexShrink:       0,
       }}>
-        <span style={{ color: '#4ade80', fontWeight: 'bold', letterSpacing: '0.12em', fontSize: 11 }}>
+        <span style={{ color: 'var(--wt-console-accent)', fontWeight: 'bold', letterSpacing: '0.12em', fontSize: 11 }}>
           NETWATCH CONSOLE
         </span>
-        <span style={{ color: '#30363d', fontSize: 11 }}>
+        <span style={{ color: 'var(--wt-console-muted)', fontSize: 11 }}>
           ` to close  ·  tab to complete  ·  ↑↓ history
         </span>
       </div>
@@ -647,11 +647,11 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
         alignItems:      'center',
         gap:              8,
         padding:         '8px 16px',
-        borderTop:       '1px solid #21262d',
-        backgroundColor: '#0d1117',
+        borderTop:       '1px solid var(--wt-console-border)',
+        backgroundColor: 'var(--wt-console-bg)',
         flexShrink:       0,
       }}>
-        <span style={{ color: '#4ade80', userSelect: 'none', flexShrink: 0 }}>$</span>
+        <span style={{ color: 'var(--wt-console-prompt)', userSelect: 'none', flexShrink: 0 }}>$</span>
         <input
           ref={inputRef}
           value={input}
@@ -662,10 +662,10 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
             background: 'transparent',
             border:     'none',
             outline:    'none',
-            color:      '#e6edf3',
+            color:      'var(--wt-console-text)',
             fontFamily: 'inherit',
             fontSize:   'inherit',
-            caretColor: '#4ade80',
+            caretColor: 'var(--wt-console-prompt)',
           }}
           spellCheck={false}
           autoComplete="off"

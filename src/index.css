@@ -1,3 +1,43 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── NetWatch signature hue (azure → violet) ─────────────────────────────── */
+:root { --nw-from: var(--wt-brand-500); --nw-to: oklch(0.480 0.150 290); --nw-ink: oklch(0.480 0.150 290); }
+[data-theme="dark"] { --nw-ink: oklch(0.760 0.130 292); }
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+body {
+  font-family: var(--wt-font-sans);
+  color: var(--wt-text);
+  background: var(--wt-bg);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}
+
+/* ── Scrollbar (token-driven, replaces the old JS-injected style) ──────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--wt-border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--wt-border-strong); }
+
+/* ── App shell grid (family chrome) ────────────────────────────────────────── */
+.app  { display: grid; grid-template-columns: 224px 1fr; grid-template-rows: 56px 1fr; height: 100vh; overflow: hidden; }
+.app__top  { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; padding: 0 16px; background: var(--wt-surface); border-bottom: 1px solid var(--wt-border); }
+.app__side { background: var(--wt-surface); border-right: 1px solid var(--wt-border); padding: 14px 12px; overflow-y: auto; }
+.app__main { overflow-y: auto; padding: var(--wt-6); }
+
+.side__group { font-family: var(--wt-font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.11em; text-transform: uppercase; color: var(--wt-text-subtle); padding: 0 8px; margin: 14px 0 6px; }
+.side__group:first-child { margin-top: 0; }
+.side__item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border-radius: var(--wt-r-md); border: 0; background: transparent; cursor: pointer; color: var(--wt-text-muted); font-family: var(--wt-font-sans); font-size: var(--wt-text-sm); text-align: left; border-left: 2px solid transparent; transition: background var(--wt-dur) var(--wt-ease), color var(--wt-dur) var(--wt-ease); }
+.side__item:hover { background: var(--wt-surface-2); color: var(--wt-text); }
+.side__item.is-active { background: color-mix(in oklch, var(--nw-ink) 12%, transparent); color: var(--nw-ink); border-left-color: var(--nw-ink); }
+.side__item__count { margin-left: auto; font-family: var(--wt-font-mono); font-size: 11px; color: var(--wt-text-subtle); font-variant-numeric: tabular-nums; }
+
+.section-head { position: sticky; top: 0; z-index: 5; padding: 8px 0; margin-bottom: 4px; background: color-mix(in oklch, var(--wt-bg) 80%, transparent); backdrop-filter: blur(8px); }
+
+@media (max-width: 1180px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: 56px 1fr; }
+  .app__side { display: none; }
+  .app__side.is-open { display: block; position: fixed; top: 56px; left: 0; bottom: 0; width: 260px; z-index: 50; box-shadow: var(--wt-shadow-lg); }
+}
