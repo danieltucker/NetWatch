@@ -7,7 +7,6 @@ import { useTheme }    from '../hooks/useTheme';
 /**
  * Read-only dashboard rendered at /embed and /embed/monitor/:id.
  * No header chrome, no edit/delete controls, no settings or alerts.
- * Served by the same Express catch-all as the main app.
  */
 export function EmbedView({ monitorId }) {
   const { t } = useTheme();
@@ -21,7 +20,6 @@ export function EmbedView({ monitorId }) {
       .catch(() => setLoading(false));
   }, []);
 
-  // SSE for live updates
   useEffect(() => {
     const es = new EventSource('/api/events');
     es.addEventListener('monitor:checked', (e) => {
@@ -40,19 +38,18 @@ export function EmbedView({ monitorId }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen text-xs font-mono"
+      <div className="flex items-center justify-center min-h-screen wt-mono text-xs"
         style={{ backgroundColor: t.pageBg, color: t.textMuted }}>
         <span className="animate-spin mr-2">⟳</span> Loading…
       </div>
     );
   }
 
-  // Single monitor widget
   if (monitorId) {
     const monitor = monitors.find(m => m.id === monitorId);
     if (!monitor) {
       return (
-        <div className="flex items-center justify-center min-h-screen text-xs font-mono"
+        <div className="flex items-center justify-center min-h-screen wt-mono text-xs"
           style={{ backgroundColor: t.pageBg, color: t.textMuted }}>
           Monitor not found
         </div>
@@ -65,7 +62,6 @@ export function EmbedView({ monitorId }) {
     );
   }
 
-  // Full read-only dashboard
   const userMonitors = monitors.filter(m => !m.tags?.includes('_ref'));
   const refMonitors  = monitors.filter(m =>  m.tags?.includes('_ref'));
 
@@ -75,13 +71,16 @@ export function EmbedView({ monitorId }) {
       {/* Minimal header */}
       <div className="px-6 py-3 border-b flex items-center gap-2"
         style={{ backgroundColor: t.headerBg, borderColor: t.cardBorder }}>
-        <Radio size={14} className="text-green-400" />
-        <span className="text-xs font-mono font-bold tracking-widest" style={{ color: t.textSecondary }}>
-          WATCHTOWER
+        <Radio size={14} style={{ color: 'var(--wt-up-500)' }} />
+        <span className="wt-eyebrow" style={{ color: t.textSecondary }}>
+          NETWATCH
         </span>
+        {/* live indicator */}
         <span className="relative flex h-1.5 w-1.5 ml-auto">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-50" />
-          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500" />
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full"
+            style={{ backgroundColor: 'var(--wt-up-500)', opacity: 0.5 }} />
+          <span className="relative inline-flex rounded-full h-1.5 w-1.5"
+            style={{ backgroundColor: 'var(--wt-up-500)' }} />
         </span>
       </div>
 
@@ -98,13 +97,7 @@ export function EmbedView({ monitorId }) {
 
         {refMonitors.length > 0 && (
           <section>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="h-px flex-1" style={{ backgroundColor: t.cardBorder }} />
-              <span className="text-xs font-mono uppercase tracking-widest px-1" style={{ color: t.textFaint }}>
-                Network Reference
-              </span>
-              <div className="h-px flex-1" style={{ backgroundColor: t.cardBorder }} />
-            </div>
+            <div className="section-head"><span className="wt-eyebrow">Reference</span></div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {refMonitors.map(m => (
                 <MonitorCard key={m.id} monitor={m} onEdit={null} onDelete={null} compact />

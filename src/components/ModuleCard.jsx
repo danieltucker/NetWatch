@@ -49,8 +49,8 @@ function ModuleCardInner({ instance, onEdit, onDelete }) {
 
   if (!moduleDef) {
     return (
-      <div className="rounded-xl border p-4 flex items-center gap-2 text-xs font-mono text-red-400"
-        style={{ borderColor: t.cardBorder, backgroundColor: t.cardBg }}>
+      <div className="wt-card p-4 flex items-center gap-2 wt-mono text-xs"
+        style={{ color: 'var(--wt-down-600)' }}>
         <AlertCircle size={13} /> Unknown module: {moduleId}
       </div>
     );
@@ -60,15 +60,7 @@ function ModuleCardInner({ instance, onEdit, onDelete }) {
   const CardComponent = moduleDef.Card;
 
   return (
-    <div
-      className="rounded-xl border flex flex-col transition-colors"
-      style={{
-        borderColor:     t.cardBorder,
-        backgroundColor: t.cardBg,
-        boxShadow: isDark
-          ? '0 1px 3px rgba(0,0,0,0.3)'
-          : '0 1px 3px rgba(0,0,0,0.06)',
-      }}>
+    <div className="wt-card flex flex-col">
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div
@@ -78,12 +70,12 @@ function ModuleCardInner({ instance, onEdit, onDelete }) {
           {IconComponent && (
             <IconComponent size={13} style={{ color: t.textMuted, flexShrink: 0 }} />
           )}
-          <span className="text-sm font-mono font-semibold truncate"
+          <span className="text-sm wt-mono font-semibold truncate"
             style={{ color: t.textPrimary }}>
             {label}
           </span>
           <span
-            className="shrink-0 text-xs font-mono px-1.5 py-0.5 rounded border"
+            className="shrink-0 text-xs wt-mono px-1.5 py-0.5 rounded border"
             style={{
               color: t.textFaint, borderColor: t.cardBorder,
               fontSize: 10, backgroundColor: t.tagBg,
@@ -143,7 +135,7 @@ function ModuleCardInner({ instance, onEdit, onDelete }) {
             {tags.map(tag => (
               <span
                 key={tag}
-                className="font-mono px-1.5 py-0.5 rounded"
+                className="wt-mono px-1.5 py-0.5 rounded"
                 style={{
                   fontSize: 10,
                   backgroundColor: t.tagBg,
@@ -154,7 +146,7 @@ function ModuleCardInner({ instance, onEdit, onDelete }) {
             ))}
           </div>
           {lastFetched && (
-            <span className="font-mono" style={{ fontSize: 10, color: t.textFaint }}>
+            <span className="wt-mono" style={{ fontSize: 10, color: t.textFaint }}>
               {lastFetched.toLocaleTimeString()}
             </span>
           )}

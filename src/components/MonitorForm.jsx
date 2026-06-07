@@ -273,16 +273,8 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
 
   // ── Derived input style ───────────────────────────────────────────────────
 
-  const inputStyle = {
-    backgroundColor: t.inputBg,
-    color:           t.textPrimary,
-    borderColor:     t.cardBorder,
-  };
-
-  const inputCls = [
-    'w-full rounded border px-3 py-2 text-sm font-mono',
-    'focus:outline-none transition-colors appearance-none',
-  ].join(' ');
+  const inputStyle = {};
+  const inputCls = 'wt-input';
 
   const formContent = (
     <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
@@ -313,7 +305,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                       onClick={() => onAddModule?.(mod.id)}
                       className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all"
                       style={{
-                        background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                        background: 'linear-gradient(135deg, var(--wt-brand-500), var(--wt-brand-600))',
                         color:      '#fff',
                         boxShadow:  '0 2px 8px rgba(59,130,246,0.35)',
                       }}>
@@ -336,7 +328,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                   onClick={() => set('checkType', ct.value)}
                   className="flex-1 py-2 text-xs font-mono rounded border transition-colors"
                   style={form.checkType === ct.value
-                    ? { backgroundColor: 'rgba(59,130,246,0.15)', borderColor: 'rgba(59,130,246,0.5)', color: '#93c5fd' }
+                    ? { backgroundColor: 'rgba(59,130,246,0.15)', borderColor: 'rgba(59,130,246,0.5)', color: 'var(--wt-brand-400)' }
                     : { backgroundColor: t.tagBg, borderColor: t.tagBorder, color: t.textMuted }
                   }>
                   {ct.label}
@@ -352,10 +344,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
               placeholder={targetPlaceholder}
               required autoFocus
               className={inputCls}
-              style={inputStyle}
-              onFocus={e => e.target.style.borderColor = '#3b82f6'}
-              onBlur={e  => e.target.style.borderColor = t.cardBorder}
-            />
+              style={inputStyle}            />
           </Field>
 
           {/* Port — TCP only */}
@@ -367,7 +356,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                 placeholder="443" required
                 className={inputCls}
                 style={inputStyle}
-                onFocus={e => e.target.style.borderColor = '#3b82f6'}
+                onFocus={e => e.target.style.borderColor = 'var(--wt-brand-500)'}
                 onBlur={e  => e.target.style.borderColor = t.cardBorder}
               />
             </Field>
@@ -378,10 +367,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
             <input type="text" value={form.label}
               onChange={e => set('label', e.target.value)}
               placeholder="Production API Gateway"
-              className={inputCls} style={inputStyle}
-              onFocus={e => e.target.style.borderColor = '#3b82f6'}
-              onBlur={e  => e.target.style.borderColor = t.cardBorder}
-            />
+              className={inputCls} style={inputStyle}            />
           </Field>
 
           {/* Description */}
@@ -389,10 +375,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
             <input type="text" value={form.description}
               onChange={e => set('description', e.target.value)}
               placeholder="Optional free-form note"
-              className={inputCls} style={inputStyle}
-              onFocus={e => e.target.style.borderColor = '#3b82f6'}
-              onBlur={e  => e.target.style.borderColor = t.cardBorder}
-            />
+              className={inputCls} style={inputStyle}            />
           </Field>
 
           {/* Interval + Tags */}
@@ -402,7 +385,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
               <select value={form.interval}
                 onChange={e => set('interval', Number(e.target.value))}
                 className={inputCls} style={inputStyle}
-                onFocus={e => e.target.style.borderColor = '#3b82f6'}
+                onFocus={e => e.target.style.borderColor = 'var(--wt-brand-500)'}
                 onBlur={e  => e.target.style.borderColor = t.cardBorder}>
                 {INTERVAL_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -421,7 +404,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                   {form.tags.map(tag => (
                     <span key={tag}
                       className="flex items-center gap-0.5 text-xs font-mono px-1.5 py-0.5 rounded"
-                      style={{ color: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.3)' }}>
+                      style={{ color: 'var(--wt-brand-500)', backgroundColor: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.3)' }}>
                       <Tag size={8} />
                       {tag}
                       <button type="button" onClick={() => removeTag(tag)}
@@ -439,7 +422,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                     onKeyDown={handleTagKeyDown}
                     placeholder={form.tags.length === 0 ? 'web, critical…' : ''}
                     className="flex-1 min-w-[60px] bg-transparent text-xs font-mono outline-none"
-                    style={{ color: t.textPrimary, caretColor: '#3b82f6' }}
+                    style={{ color: t.textPrimary, caretColor: 'var(--wt-brand-500)' }}
                   />
                 </div>
 
@@ -455,7 +438,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                         style={{ color: t.textSecondary }}
                         onMouseEnter={e => e.currentTarget.style.backgroundColor = t.tagBg}
                         onMouseLeave={e => e.currentTarget.style.backgroundColor = ''}>
-                        <Tag size={9} style={{ color: '#60a5fa' }} />
+                        <Tag size={9} style={{ color: 'var(--wt-brand-500)' }} />
                         {tag}
                       </button>
                     ))}
@@ -463,7 +446,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                       <button type="button"
                         onMouseDown={e => { e.preventDefault(); addTag(form.tagInput); }}
                         className="w-full flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono text-left border-t transition-colors"
-                        style={{ color: '#60a5fa', borderColor: t.tooltipBorder }}
+                        style={{ color: 'var(--wt-brand-500)', borderColor: t.tooltipBorder }}
                         onMouseEnter={e => e.currentTarget.style.backgroundColor = t.tagBg}
                         onMouseLeave={e => e.currentTarget.style.backgroundColor = ''}>
                         <Plus size={9} />
@@ -486,9 +469,9 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                   <button key={type} type="button" onClick={() => { toggleAlert(type); setFormError(''); }}
                     className="px-3 py-1.5 text-xs font-mono rounded border transition-colors"
                     style={misconfigured
-                      ? { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: 'rgba(245,158,11,0.5)', color: '#fbbf24' }
+                      ? { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: 'rgba(245,158,11,0.5)', color: 'var(--wt-warn-500)' }
                       : active
-                        ? { backgroundColor: 'rgba(59,130,246,0.15)', borderColor: 'rgba(59,130,246,0.5)', color: '#93c5fd' }
+                        ? { backgroundColor: 'rgba(59,130,246,0.15)', borderColor: 'rgba(59,130,246,0.5)', color: 'var(--wt-brand-400)' }
                         : { backgroundColor: t.tagBg, borderColor: t.tagBorder, color: t.textMuted }
                     }>
                     {type}
@@ -507,7 +490,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                 onChange={e => set('degradedThreshold', e.target.value)}
                 placeholder="e.g. 500"
                 className={inputCls} style={inputStyle}
-                onFocus={e => e.target.style.borderColor = '#f59e0b'}
+                onFocus={e => e.target.style.borderColor = 'var(--wt-warn-500)'}
                 onBlur={e  => e.target.style.borderColor = t.cardBorder}
               />
             </Field>
@@ -524,7 +507,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                     onChange={e => set('expectedStatus', e.target.value)}
                     placeholder="200"
                     className={inputCls} style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = '#3b82f6'}
+                    onFocus={e => e.target.style.borderColor = 'var(--wt-brand-500)'}
                     onBlur={e  => e.target.style.borderColor = t.cardBorder}
                   />
                 </Field>
@@ -533,7 +516,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                   <select value={form.authType}
                     onChange={e => set('authType', e.target.value)}
                     className={inputCls} style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = '#3b82f6'}
+                    onFocus={e => e.target.style.borderColor = 'var(--wt-brand-500)'}
                     onBlur={e  => e.target.style.borderColor = t.cardBorder}>
                     <option value="none">None</option>
                     <option value="basic">Basic Auth</option>
@@ -550,7 +533,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                       onChange={e => set('authUser', e.target.value)}
                       placeholder="user"
                       className={inputCls} style={inputStyle}
-                      onFocus={e => e.target.style.borderColor = '#3b82f6'}
+                      onFocus={e => e.target.style.borderColor = 'var(--wt-brand-500)'}
                       onBlur={e  => e.target.style.borderColor = t.cardBorder}
                     />
                   </Field>
@@ -559,7 +542,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                       onChange={e => set('authPass', e.target.value)}
                       placeholder="••••••••"
                       className={inputCls} style={inputStyle}
-                      onFocus={e => e.target.style.borderColor = '#3b82f6'}
+                      onFocus={e => e.target.style.borderColor = 'var(--wt-brand-500)'}
                       onBlur={e  => e.target.style.borderColor = t.cardBorder}
                     />
                   </Field>
@@ -573,7 +556,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                     onChange={e => set('authToken', e.target.value)}
                     placeholder="eyJ…"
                     className={inputCls} style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = '#3b82f6'}
+                    onFocus={e => e.target.style.borderColor = 'var(--wt-brand-500)'}
                     onBlur={e  => e.target.style.borderColor = t.cardBorder}
                   />
                 </Field>
@@ -588,14 +571,14 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                         onChange={e => setHeader(i, 'key', e.target.value)}
                         placeholder="Header-Name"
                         className={`${inputCls} flex-1`} style={inputStyle}
-                        onFocus={e => e.target.style.borderColor = '#3b82f6'}
+                        onFocus={e => e.target.style.borderColor = 'var(--wt-brand-500)'}
                         onBlur={e  => e.target.style.borderColor = t.cardBorder}
                       />
                       <input type="text" value={h.value}
                         onChange={e => setHeader(i, 'value', e.target.value)}
                         placeholder="value"
                         className={`${inputCls} flex-1`} style={inputStyle}
-                        onFocus={e => e.target.style.borderColor = '#3b82f6'}
+                        onFocus={e => e.target.style.borderColor = 'var(--wt-brand-500)'}
                         onBlur={e  => e.target.style.borderColor = t.cardBorder}
                       />
                       {form.requestHeaders.length > 1 && (
@@ -624,7 +607,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                   onChange={e => set('bodyMatch', e.target.value)}
                   placeholder='"ok"  or  "status":"healthy"'
                   className={inputCls} style={inputStyle}
-                  onFocus={e => e.target.style.borderColor = '#a78bfa'}
+                  onFocus={e => e.target.style.borderColor = 'var(--wt-viz-6)'}
                   onBlur={e  => e.target.style.borderColor = t.cardBorder}
                 />
               </Field>
@@ -636,7 +619,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                     onChange={e => set('jsonPath', e.target.value)}
                     placeholder="data.status"
                     className={`${inputCls} flex-1`} style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = '#a78bfa'}
+                    onFocus={e => e.target.style.borderColor = 'var(--wt-viz-6)'}
                     onBlur={e  => e.target.style.borderColor = t.cardBorder}
                   />
                   <span className="flex items-center text-xs font-mono shrink-0"
@@ -645,7 +628,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                     onChange={e => set('jsonExpected', e.target.value)}
                     placeholder="healthy"
                     className={`${inputCls} flex-1`} style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = '#a78bfa'}
+                    onFocus={e => e.target.style.borderColor = 'var(--wt-viz-6)'}
                     onBlur={e  => e.target.style.borderColor = t.cardBorder}
                   />
                 </div>
@@ -692,7 +675,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                         <span className="absolute top-0.5 h-4 w-4 rounded-full transition-all"
                           style={{
                             left:            cfg.panel ? '18px' : '2px',
-                            backgroundColor: cfg.panel ? '#3b82f6' : t.textFaint,
+                            backgroundColor: cfg.panel ? 'var(--wt-brand-500)' : t.textFaint,
                           }} />
                       </button>
                     </div>
@@ -718,7 +701,7 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
           {/* Form-level error */}
           {formError && (
             <div className="flex items-start gap-2 px-3 py-2.5 rounded border text-xs font-mono"
-              style={{ backgroundColor: 'rgba(245,158,11,0.08)', borderColor: 'rgba(245,158,11,0.3)', color: '#fbbf24' }}>
+              style={{ backgroundColor: 'rgba(245,158,11,0.08)', borderColor: 'rgba(245,158,11,0.3)', color: 'var(--wt-warn-500)' }}>
               <span className="shrink-0 mt-0.5">⚠</span>
               {formError}
             </div>
@@ -730,22 +713,19 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
           <div className="flex flex-col gap-2 px-6 py-4 border-t shrink-0"
             style={{ borderColor: t.metricGap }}>
             {error && (activeTab === 'monitor' || embedded) && (
-              <div className="flex items-start gap-2 text-xs font-mono text-red-400">
+              <div className="flex items-start gap-2 text-xs" style={{ color: 'var(--wt-down-600)' }}>
                 <AlertCircle size={12} className="shrink-0 mt-0.5" />
                 <span className="leading-relaxed">{error}</span>
               </div>
             )}
-            <div className="flex justify-end items-center gap-3">
+            <div className="flex justify-end items-center gap-2">
             {!embedded && (
-            <button type="button" onClick={onCancel} disabled={submitting}
-              className="px-4 py-2 text-xs font-mono transition-colors disabled:opacity-40"
-              style={{ color: t.textMuted }}>
+            <button type="button" onClick={onCancel} disabled={submitting} className="wt-btn wt-btn--ghost">
               Cancel
             </button>
             )}
             {(activeTab === 'monitor' || embedded) && (
-              <button type="submit" disabled={submitting}
-                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white text-xs font-mono font-bold rounded transition-colors">
+              <button type="submit" disabled={submitting} className="wt-btn wt-btn--primary" style={{ opacity: submitting ? 0.6 : 1 }}>
                 {submitting
                   ? <><Loader size={13} className="animate-spin" /> Saving…</>
                   : isEditing
@@ -794,8 +774,8 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
                 onClick={() => setActiveTab(tab.id)}
                 className="px-5 py-2.5 text-xs font-mono font-semibold transition-colors border-b-2 -mb-px"
                 style={{
-                  color:          activeTab === tab.id ? '#60a5fa' : t.textMuted,
-                  borderColor:    activeTab === tab.id ? '#60a5fa' : 'transparent',
+                  color:          activeTab === tab.id ? 'var(--wt-brand-500)' : t.textMuted,
+                  borderColor:    activeTab === tab.id ? 'var(--wt-brand-500)' : 'transparent',
                   backgroundColor: 'transparent',
                 }}>
                 {tab.label}
@@ -812,13 +792,12 @@ export function MonitorForm({ editingMonitor, onSubmit, onCancel, submitting = f
 
 function Field({ label, hint, required, children, t }) {
   return (
-    <div>
-      <div className="flex items-baseline gap-2 mb-1.5">
-        <label className="text-xs font-mono uppercase tracking-wider"
-          style={{ color: t.textMuted }}>
-          {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+    <div className="wt-field">
+      <div className="flex items-baseline gap-2">
+        <label className="wt-eyebrow">
+          {label}{required && <span style={{ color: 'var(--wt-down-500)', marginLeft: 2 }}>*</span>}
         </label>
-        {hint && <span className="text-xs font-mono" style={{ color: t.textFaint }}>{hint}</span>}
+        {hint && <span className="text-xs" style={{ color: t.textFaint }}>{hint}</span>}
       </div>
       {children}
     </div>
