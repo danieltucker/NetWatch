@@ -31,7 +31,7 @@ body {
 .side__group:first-child { margin-top: 0; }
 .side__item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border-radius: var(--wt-r-md); border: 0; background: transparent; cursor: pointer; color: var(--wt-text-muted); font-family: var(--wt-font-sans); font-size: var(--wt-text-sm); text-align: left; border-left: 2px solid transparent; transition: background var(--wt-dur) var(--wt-ease), color var(--wt-dur) var(--wt-ease); }
 .side__item:hover { background: var(--wt-surface-2); color: var(--wt-text); }
-.side__item.is-active { background: color-mix(in oklch, var(--nw-ink) 12%, transparent); color: var(--nw-ink); border-left-color: var(--nw-ink); }
+.side__item.is-active { background: color-mix(in oklch, var(--wt-brand-500) 10%, transparent); color: var(--wt-brand-500); border-left-color: var(--wt-brand-400); }
 .side__item__count { margin-left: auto; font-family: var(--wt-font-mono); font-size: 11px; color: var(--wt-text-subtle); font-variant-numeric: tabular-nums; }
 
 .section-head { position: sticky; top: 0; z-index: 5; padding: var(--wt-6) 0 10px; margin-bottom: 4px; background: var(--wt-bg); }

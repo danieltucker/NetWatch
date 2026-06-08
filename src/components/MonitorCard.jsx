@@ -355,8 +355,8 @@ function MonitorCardInner({
       </div>
 
       {/* ── Metrics row ── */}
-      <div className="grid grid-cols-2 border-t" style={{ borderColor: t.metricGap }}>
-        <div className="border-r" style={{ borderColor: t.metricGap }}>
+      <div className="grid grid-cols-2 pt-1">
+        <div>
           <MetricCell label="Ping"
             value={pingHas ? ping : '—'} unit={pingHas ? 'ms' : ''} valueColor={pingColor}
             barPct={pingBarPct} barColor={pingColor}
@@ -381,7 +381,7 @@ function MonitorCardInner({
       )}
 
       {/* ── Sparkline ── */}
-      <div className="px-2 pb-2 border-t pt-2" style={{ borderColor: t.metricGap }}>
+      <div className="px-2 pb-2 pt-1">
         {chartData.length > 0 ? (
           <div ref={chartRef} style={{ width: '100%', height: 64 }}>
             <ResponsiveContainer width="100%" height="100%">

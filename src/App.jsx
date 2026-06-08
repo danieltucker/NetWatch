@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Radio, Activity, AlertTriangle, Bell, Tag as TagIcon, Settings, Code, X, Menu, Search, Zap, Calendar } from 'lucide-react';
+import { Plus, Radio, Activity, AlertTriangle, Bell, Tag as TagIcon, Settings, Code, X, Menu, Search, Zap, Calendar, LayoutGrid, List, AlertCircle as IncidentIcon } from 'lucide-react';
 import {
   DndContext, closestCenter,
   KeyboardSensor, PointerSensor,
@@ -23,7 +23,8 @@ import { StatusDot }           from './components/StatusIndicators';
 import { ModuleCard }          from './components/ModuleCard';
 import { MonitorForm }         from './components/MonitorForm';
 import { ModuleInstanceForm }  from './components/ModuleInstanceForm';
-import { AlertsPanel }         from './components/AlertsPanel';
+import { AlertsBanner }        from './components/AlertsBanner';
+import { IncidentsPage }       from './components/IncidentsPage';
 import { SettingsPanel }       from './components/SettingsPanel';
 import { EmbedModal }          from './components/EmbedModal';
 import { MonitorDetailModal }  from './components/MonitorDetailModal';
@@ -125,7 +126,7 @@ export default function App() {
   const { alerts, dismiss: dismissAlert, dismissAll } = useAlerts((alert) => {
     if (alertsAutoOpen === 'never') return;
     if (alertsAutoOpen === 'outage' && alert.type !== 'outage') return;
-    setShowAlerts(true);
+    setAlertsExpanded(true);
   });
   const { instances, addInstance, updateInstance, deleteInstance } = useModuleInstances();
 
@@ -142,7 +143,9 @@ export default function App() {
   const [tagFilter,      setTagFilter]      = useState([]);
   const [searchQuery,    setSearchQuery]    = useState('');
   const [statusFilter,   setStatusFilter]   = useState('all');
-  const [showAlerts,     setShowAlerts]     = useState(false);
+  const [alertsExpanded, setAlertsExpanded] = useState(false);
+  const [view,           setView]           = useState('monitors'); // 'monitors' | 'incidents'
+  const [viewMode,       setViewMode]       = useState('grid');     // 'grid' | 'list'
   const [sortBy,         setSortBy]         = useState('default');
   const [showSettings,    setShowSettings]    = useState(false);
   const [embedMonitor,    setEmbedMonitor]    = useState(null);
@@ -352,7 +355,7 @@ export default function App() {
 
           {/* ghost icon buttons — desktop */}
           <div className="hidden wide:flex items-center gap-1">
-            <button onClick={() => setShowAlerts(p => !p)} className="wt-btn wt-btn--ghost wt-btn--sm relative" title="Alerts"
+            <button onClick={() => setAlertsExpanded(p => !p)} className="wt-btn wt-btn--ghost wt-btn--sm relative" title="Alerts"
               style={ongoingCount > 0 ? { color: 'var(--wt-down-600)' } : undefined}>
               <Bell size={16} />
               {ongoingCount > 0 && (
@@ -367,7 +370,7 @@ export default function App() {
           <button onClick={openAdd} className="hidden wide:inline-flex wt-btn wt-btn--primary"><Plus size={15} />Add monitor</button>
 
           {/* mobile: alerts + hamburger */}
-          <button onClick={() => setShowAlerts(p => !p)} className="wide:hidden wt-btn wt-btn--ghost wt-btn--sm relative" title="Alerts"
+          <button onClick={() => setAlertsExpanded(p => !p)} className="wide:hidden wt-btn wt-btn--ghost wt-btn--sm relative" title="Alerts"
             style={ongoingCount > 0 ? { color: 'var(--wt-down-600)' } : undefined}>
             <Bell size={16} />
             {ongoingCount > 0 && (
@@ -400,6 +403,25 @@ export default function App() {
             <span className="side__item__count">{row.count}</span>
           </button>
         ))}
+
+        {/* VIEWS */}
+        <div className="side__group">Views</div>
+        <button className={`side__item ${view === 'monitors' ? 'is-active' : ''}`}
+          onClick={() => { setView('monitors'); setMobileMenuOpen(false); }}>
+          <Activity size={12} style={{ flexShrink: 0 }} />
+          <span>Monitors</span>
+          <span className="side__item__count">{userMonitors.length}</span>
+        </button>
+        <button className={`side__item ${view === 'incidents' ? 'is-active' : ''}`}
+          onClick={() => { setView('incidents'); setMobileMenuOpen(false); }}>
+          <IncidentIcon size={12} style={{ flexShrink: 0 }} />
+          <span>Incidents</span>
+          {alerts.filter(a => !a.resolvedAt).length > 0 && (
+            <span className="side__item__count" style={{ color: 'var(--wt-down-500)' }}>
+              {alerts.filter(a => !a.resolvedAt).length}
+            </span>
+          )}
+        </button>
 
         {/* TAGS */}
         {allTags.length > 0 && (
@@ -434,34 +456,70 @@ export default function App() {
       {/* ── Main ── */}
       <main className="app__main">
 
-        {/* Alerts panel */}
-        {showAlerts && (
-          <AlertsPanel
-            alerts={alerts}
-            onDismiss={dismissAlert}
-            onDismissAll={dismissAll}
-            onClose={() => setShowAlerts(false)}
-          />
-        )}
+        {/* Alerts banner — persistent, self-hides when no alerts */}
+        <AlertsBanner
+          alerts={alerts}
+          onDismiss={dismissAlert}
+          onDismissAll={dismissAll}
+          expanded={alertsExpanded}
+          onToggle={() => setAlertsExpanded(p => !p)}
+        />
 
         {loading && <LoadingState t={t} />}
         {error   && <ErrorState  message={error} t={t} />}
 
-        {!loading && !error && (
+        {!loading && !error && view === 'incidents' && (
+          <IncidentsPage
+            monitors={userMonitors}
+            onOpenDetail={(mon, tab, ts) => {
+              setIncidentTimestamp(ts ?? null);
+              openDetail(mon, tab);
+            }}
+          />
+        )}
+
+        {!loading && !error && view === 'monitors' && (
           <>
             {userMonitors.length > 0 && <SummaryBar monitors={userMonitors} />}
 
             {/* ── Monitors ── */}
             <section>
-              <div className="section-head"><span className="wt-eyebrow">Monitors</span></div>
+              <div className="section-head flex items-center justify-between">
+                <span className="wt-eyebrow">Monitors</span>
+                {userMonitors.length > 0 && (
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      onClick={() => setViewMode('grid')}
+                      className="wt-btn wt-btn--ghost wt-btn--sm"
+                      title="Card view"
+                      style={viewMode === 'grid' ? { color: 'var(--nw-ink)', background: 'color-mix(in oklch, var(--nw-ink) 12%, transparent)' } : undefined}>
+                      <LayoutGrid size={14} />
+                    </button>
+                    <button
+                      onClick={() => setViewMode('list')}
+                      className="wt-btn wt-btn--ghost wt-btn--sm"
+                      title="List view"
+                      style={viewMode === 'list' ? { color: 'var(--nw-ink)', background: 'color-mix(in oklch, var(--nw-ink) 12%, transparent)' } : undefined}>
+                      <List size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
 
-            {/* Monitor grid */}
+            {/* Monitor grid or list */}
             {userMonitors.length === 0 ? (
               <EmptyState onAdd={openAdd} t={t} />
             ) : filteredMonitors.length === 0 ? (
               <div className="py-12 text-center text-xs" style={{ color: t.textMuted }}>
                 No monitors match the selected filters
               </div>
+            ) : viewMode === 'list' ? (
+              <MonitorListView
+                monitors={filteredMonitors}
+                onCardClick={mon => openDetail(mon, 'history')}
+                onEdit={mon => openDetail(mon, 'configure')}
+                t={t}
+              />
             ) : (
               <DndContext
                 sensors={sensors}
@@ -586,6 +644,85 @@ export default function App() {
           allTags={allTags}
         />
       )}
+    </div>
+  );
+}
+
+// ── List view ─────────────────────────────────────────────────────────────────
+
+const CHECK_LABELS = { http: 'HTTP', api: 'API', tcp: 'TCP', icmp: 'ICMP' };
+
+function MonitorListView({ monitors, onCardClick, onEdit, t }) {
+  return (
+    <div className="wt-card overflow-hidden">
+      {monitors.map((m, i) => {
+        const isLast = i === monitors.length - 1;
+        const uptimeColor = m.uptimePercent == null ? t.textFaint
+          : m.uptimePercent >= 99  ? 'var(--wt-up-600)'
+          : m.uptimePercent >= 95  ? 'var(--wt-warn-600)'
+          : 'var(--wt-down-600)';
+        const pingColor = m.status === 'down' ? 'var(--wt-down-600)'
+          : m.status === 'degraded' ? 'var(--wt-warn-600)'
+          : t.textPrimary;
+
+        return (
+          <div
+            key={m.id}
+            className="flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors"
+            style={{
+              borderBottom: isLast ? 'none' : `1px solid var(--wt-border)`,
+            }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--wt-surface-2)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = ''}
+            onClick={() => onCardClick(m)}>
+
+            {/* Status dot */}
+            <StatusDot status={m.status} />
+
+            {/* Name */}
+            <span className="flex-1 min-w-0 text-sm font-medium truncate" style={{ color: t.textPrimary }}>
+              {m.label}
+            </span>
+
+            {/* Check type chip */}
+            <span className="wt-mono text-[10px] px-1.5 py-0.5 rounded border shrink-0"
+              style={{ color: t.textFaint, borderColor: 'var(--wt-border)', fontSize: 10 }}>
+              {CHECK_LABELS[m.checkType] ?? (m.checkType ?? 'HTTP').toUpperCase()}
+            </span>
+
+            {/* Ping */}
+            <span className="wt-mono text-xs w-16 text-right shrink-0" style={{ color: pingColor }}>
+              {m.currentPing != null ? `${m.currentPing}ms` : '—'}
+            </span>
+
+            {/* Uptime */}
+            <span className="wt-mono text-xs w-14 text-right shrink-0" style={{ color: uptimeColor }}>
+              {m.uptimePercent != null ? `${m.uptimePercent.toFixed(1)}%` : '—'}
+            </span>
+
+            {/* Last checked */}
+            <span className="wt-mono text-xs w-24 text-right shrink-0 hidden md:block" style={{ color: t.textFaint }}>
+              {m.lastChecked
+                ? new Date(m.lastChecked).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
+                : '—'}
+            </span>
+
+            {/* Tags */}
+            {m.tags?.filter(tag => tag !== '_ref').length > 0 && (
+              <div className="hidden lg:flex items-center gap-1 shrink-0">
+                {m.tags.filter(tag => tag !== '_ref').slice(0, 2).map(tag => (
+                  <span key={tag} className="wt-chip wt-chip--plain" style={{ fontSize: 10 }}>{tag}</span>
+                ))}
+                {m.tags.filter(tag => tag !== '_ref').length > 2 && (
+                  <span className="wt-mono text-xs" style={{ color: t.textFaint }}>
+                    +{m.tags.filter(tag => tag !== '_ref').length - 2}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

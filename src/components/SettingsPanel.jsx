@@ -282,7 +282,7 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
           {/* Mobile header: title + close button */}
           <div className="flex items-center justify-between px-5 pt-6 pb-3 sm:hidden">
             <div className="flex items-center gap-2.5">
-              <Settings2 size={15} style={{ color: 'var(--nw-ink)' }} />
+              <Settings2 size={15} style={{ color: 'var(--wt-brand-400)' }} />
               <span className="text-sm wt-mono font-bold uppercase tracking-[0.15em]"
                 style={{ color: t.textSecondary }}>
                 Settings
@@ -299,7 +299,7 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
           {/* Desktop header: brand only */}
           <div className="hidden sm:block px-5 pt-6 pb-4">
             <div className="flex items-center gap-2.5 mb-1">
-              <Settings2 size={14} style={{ color: 'var(--nw-ink)' }} />
+              <Settings2 size={14} style={{ color: 'var(--wt-brand-400)' }} />
               <span className="text-xs wt-mono font-bold uppercase tracking-[0.15em]"
                 style={{ color: t.textSecondary }}>
                 Settings
@@ -312,21 +312,23 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
           <div className="sm:hidden mx-5 mb-2 h-px" style={{ backgroundColor: t.cardBorder }} />
 
           {/* Tab list */}
-          <nav className="flex-1 px-3 space-y-0.5 py-1">
+          <nav className="flex-1 px-2 space-y-0.5 py-1">
             {TABS.map(({ id, label, Icon }) => {
               const isActive = activeTab === id;
               return (
                 <button
                   key={id}
                   onClick={() => { setActiveTab(id); setMobileContentOpen(true); }}
-                  className="w-full flex items-center gap-3 px-3 py-3.5 sm:py-2.5 rounded-lg text-sm wt-mono transition-all text-left"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm wt-mono transition-all text-left"
                   style={{
-                    color:           isActive ? 'var(--nw-ink)' : t.textMuted,
-                    backgroundColor: isActive ? 'color-mix(in oklch, var(--nw-ink) 12%, transparent)' : 'transparent',
-                    fontWeight: isActive ? 600 : 400,
-                    borderLeft: isActive ? '2px solid var(--nw-ink)' : '2px solid transparent',
-                  }}>
-                  <Icon size={15} style={{ flexShrink: 0, opacity: isActive ? 1 : 0.6 }} />
+                    color:           isActive ? 'var(--wt-brand-400)' : t.textMuted,
+                    backgroundColor: isActive ? 'color-mix(in oklch, var(--wt-brand-500) 10%, transparent)' : 'transparent',
+                    fontWeight:      isActive ? 600 : 400,
+                    borderLeft:      isActive ? '2px solid var(--wt-brand-400)' : '2px solid transparent',
+                  }}
+                  onMouseEnter={e => { if (!isActive) e.currentTarget.style.backgroundColor = 'var(--wt-surface-2)'; }}
+                  onMouseLeave={e => { if (!isActive) e.currentTarget.style.backgroundColor = 'transparent'; }}>
+                  <Icon size={14} style={{ flexShrink: 0, opacity: isActive ? 1 : 0.55 }} />
                   {label}
                 </button>
               );
@@ -352,7 +354,7 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
             <button
               onClick={() => setMobileContentOpen(false)}
               className="sm:hidden flex items-center gap-1 px-2 py-1.5 -ml-1 rounded-lg text-sm wt-mono transition-colors"
-              style={{ color: 'var(--nw-ink)' }}>
+              style={{ color: 'var(--wt-brand-400)' }}>
               <ChevronLeft size={16} />
               Back
             </button>
@@ -525,8 +527,8 @@ function GeneralTab({ chartYMax, onChartYMaxChange, alertsAutoOpen, onAlertsAuto
                   backgroundColor: isActive
                     ? 'color-mix(in oklch, var(--wt-brand-500) 12%, transparent)'
                     : 'var(--wt-surface-2)',
-                  borderColor:     isActive ? 'var(--nw-ink)' : t.cardBorder,
-                  color:           isActive ? 'var(--nw-ink)' : t.textSecondary,
+                  borderColor:     isActive ? 'var(--wt-brand-400)' : t.cardBorder,
+                  color:           isActive ? 'var(--wt-brand-400)' : t.textSecondary,
                 }}>
                 {label}
               </button>
@@ -728,8 +730,8 @@ function NotificationsTab({ settings, set, testState, test, inputCls, inputStyle
                           backgroundColor: isActive
                             ? 'color-mix(in oklch, var(--wt-brand-500) 12%, transparent)'
                             : 'var(--wt-surface-2)',
-                          borderColor: isActive ? 'var(--nw-ink)' : t.cardBorder,
-                          color:       isActive ? 'var(--nw-ink)' : t.textSecondary,
+                          borderColor: isActive ? 'var(--wt-brand-400)' : t.cardBorder,
+                          color:       isActive ? 'var(--wt-brand-400)' : t.textSecondary,
                         }}>
                         {p.name}
                       </button>
@@ -743,7 +745,7 @@ function NotificationsTab({ settings, set, testState, test, inputCls, inputStyle
                     {active.note}
                     {active.authType === 'oauth2' && (
                       <a href="https://portal.azure.com" target="_blank" rel="noopener noreferrer"
-                        className="ml-1 underline" style={{ color: 'var(--nw-ink)' }}>
+                        className="ml-1 underline" style={{ color: 'var(--wt-brand-400)' }}>
                         Azure Portal
                       </a>
                     )}
@@ -812,7 +814,7 @@ function NotificationsTab({ settings, set, testState, test, inputCls, inputStyle
                           style={{
                             background: 'color-mix(in oklch, var(--wt-brand-500) 11%, transparent)',
                             border:     '1px solid color-mix(in oklch, var(--wt-brand-500) 30%, transparent)',
-                            color:      'var(--nw-ink)',
+                            color:      'var(--wt-brand-400)',
                             opacity:    (!settings.email_oauth_client_id?.trim() || oauthConnecting) ? 0.5 : 1,
                             cursor:     (!settings.email_oauth_client_id?.trim() || oauthConnecting) ? 'not-allowed' : 'pointer',
                           }}>
@@ -1085,7 +1087,7 @@ function ReportsTab({ settings, set, reportLastSent, invalidFields, inputCls, in
       <div
         className="rounded-xl border px-5 py-4 space-y-1.5"
         style={{ borderColor: t.cardBorder, backgroundColor: 'color-mix(in oklch, var(--wt-brand-500) 5%, transparent)' }}>
-        <div className="text-xs wt-mono font-semibold" style={{ color: 'var(--nw-ink)' }}>
+        <div className="text-xs wt-mono font-semibold" style={{ color: 'var(--wt-brand-400)' }}>
           How reports work
         </div>
         <div className="text-xs wt-mono leading-relaxed" style={{ color: t.textMuted }}>
@@ -1149,7 +1151,7 @@ function ModulesTab({ moduleSettings, onSaveModuleSettings, moduleSaving, module
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1 text-xs wt-mono mt-1"
-          style={{ color: 'var(--nw-ink)' }}>
+          style={{ color: 'var(--wt-brand-400)' }}>
           Read MODULES.md <ExternalLink size={10} />
         </a>
       </div>
@@ -1446,7 +1448,7 @@ function NetworkTab({ networkRefsEnabled, setNetworkRefsEnabled, networkRefsCust
       <div
         className="rounded-xl border px-4 py-3.5 space-y-1"
         style={{ borderColor: t.cardBorder, backgroundColor: 'color-mix(in oklch, var(--wt-brand-500) 5%, transparent)' }}>
-        <div className="text-xs wt-mono font-semibold" style={{ color: 'var(--nw-ink)' }}>
+        <div className="text-xs wt-mono font-semibold" style={{ color: 'var(--wt-brand-400)' }}>
           What are network references?
         </div>
         <div className="text-xs wt-mono leading-relaxed" style={{ color: t.textMuted }}>
