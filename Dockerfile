@@ -1,5 +1,7 @@
 # ── Stage 1: Build the React frontend ────────────────────────────────────────
-FROM node:22-alpine AS frontend
+# Pinned to amd64 — output is architecture-agnostic static files (JS/CSS/HTML),
+# so there's no reason to run this through QEMU when cross-compiling for arm64.
+FROM --platform=linux/amd64 node:22-alpine AS frontend
 
 WORKDIR /build
 
