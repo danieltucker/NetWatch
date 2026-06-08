@@ -9,6 +9,10 @@ export default {
       fontFamily: {
         mono: ['JetBrains Mono', 'Fira Code', 'Cascadia Code', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
+      // Matches the CSS sidebar-collapse breakpoint (index.css @media max-width:1180px)
+      screens: {
+        wide: '1181px',
+      },
     },
   },
   plugins: [],

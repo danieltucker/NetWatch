@@ -335,11 +335,11 @@ export default function App() {
         <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em', color: 'var(--wt-text)' }}>
           Net<span style={{ color: 'var(--nw-ink)' }}>Watch</span>
         </span>
-        <span className="wt-chip wt-chip--plain">v6.6.0</span>
+        <span className="wt-chip wt-chip--plain">v6.7.0</span>
 
         <div className="flex items-center gap-2" style={{ marginLeft: 'auto' }}>
           {/* live indicator */}
-          <div className="hidden sm:flex items-center gap-1.5 mr-1">
+          <div className="hidden wide:flex items-center gap-1.5 mr-1">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full" style={{ backgroundColor: 'var(--wt-up-500)', opacity: 0.5 }} />
               <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: 'var(--wt-up-500)' }} />
@@ -348,10 +348,10 @@ export default function App() {
           </div>
 
           {/* search — desktop */}
-          <div className="hidden sm:block"><MonitorSearch value={searchQuery} onChange={setSearchQuery} t={t} /></div>
+          <div className="hidden wide:block"><MonitorSearch value={searchQuery} onChange={setSearchQuery} t={t} /></div>
 
           {/* ghost icon buttons — desktop */}
-          <div className="hidden sm:flex items-center gap-1">
+          <div className="hidden wide:flex items-center gap-1">
             <button onClick={() => setShowAlerts(p => !p)} className="wt-btn wt-btn--ghost wt-btn--sm relative" title="Alerts"
               style={ongoingCount > 0 ? { color: 'var(--wt-down-600)' } : undefined}>
               <Bell size={16} />
@@ -364,10 +364,10 @@ export default function App() {
             <button onClick={() => setShowSettings(true)} className="wt-btn wt-btn--ghost wt-btn--sm" title="Settings"><Settings size={16} /></button>
           </div>
 
-          <button onClick={openAdd} className="hidden sm:inline-flex wt-btn wt-btn--primary"><Plus size={15} />Add monitor</button>
+          <button onClick={openAdd} className="hidden wide:inline-flex wt-btn wt-btn--primary"><Plus size={15} />Add monitor</button>
 
           {/* mobile: alerts + hamburger */}
-          <button onClick={() => setShowAlerts(p => !p)} className="sm:hidden wt-btn wt-btn--ghost wt-btn--sm relative" title="Alerts"
+          <button onClick={() => setShowAlerts(p => !p)} className="wide:hidden wt-btn wt-btn--ghost wt-btn--sm relative" title="Alerts"
             style={ongoingCount > 0 ? { color: 'var(--wt-down-600)' } : undefined}>
             <Bell size={16} />
             {ongoingCount > 0 && (
@@ -375,7 +375,7 @@ export default function App() {
                 style={{ backgroundColor: 'var(--wt-down-500)', color: '#fff', fontSize: 9, fontWeight: 700 }}>{ongoingCount}</span>
             )}
           </button>
-          <button onClick={() => setMobileMenuOpen(p => !p)} className="sm:hidden wt-btn wt-btn--ghost wt-btn--sm" title="Menu">
+          <button onClick={() => setMobileMenuOpen(p => !p)} className="wide:hidden wt-btn wt-btn--ghost wt-btn--sm" title="Menu">
             {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>
@@ -384,7 +384,7 @@ export default function App() {
       {/* ── Sidebar ── */}
       <aside className={`app__side ${mobileMenuOpen ? 'is-open' : ''}`}>
         {/* mobile-only quick actions */}
-        <div className="sm:hidden flex items-center gap-2 mb-3">
+        <div className="wide:hidden flex items-center gap-2 mb-3">
           <button onClick={() => { openAdd(); setMobileMenuOpen(false); }} className="wt-btn wt-btn--primary wt-btn--sm"><Plus size={14} />Add</button>
           <button onClick={() => { setEmbedMonitor(undefined); setMobileMenuOpen(false); }} className="wt-btn wt-btn--ghost wt-btn--sm" title="Embed"><Code size={14} /></button>
           <button onClick={() => { setShowSettings(true); setMobileMenuOpen(false); }} className="wt-btn wt-btn--ghost wt-btn--sm" title="Settings"><Settings size={14} /></button>
