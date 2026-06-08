@@ -96,21 +96,51 @@ db.exec(`
     created_at   TEXT NOT NULL,
     last_used_at TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS groups (
+    id            TEXT    PRIMARY KEY,
+    name          TEXT    NOT NULL,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS monitor_groups (
+    monitor_id TEXT NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+    group_id   TEXT NOT NULL REFERENCES groups(id)   ON DELETE CASCADE,
+    PRIMARY KEY (monitor_id, group_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS maintenance_events (
+    id         TEXT    PRIMARY KEY,
+    name       TEXT    NOT NULL,
+    note       TEXT    NOT NULL DEFAULT '',
+    start_at   TEXT    NOT NULL,
+    end_at     TEXT    NOT NULL,
+    created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS maintenance_monitors (
+    event_id   TEXT NOT NULL REFERENCES maintenance_events(id) ON DELETE CASCADE,
+    monitor_id TEXT NOT NULL REFERENCES monitors(id)           ON DELETE CASCADE,
+    PRIMARY KEY (event_id, monitor_id)
+  );
 `);
 
 // ── Migrations for existing databases ─────────────────────────────────────────
 for (const sql of [
-  `ALTER TABLE monitors ADD COLUMN degraded_threshold INTEGER`,
-  `ALTER TABLE monitors ADD COLUMN alert_config TEXT NOT NULL DEFAULT '{}'`,
-  `ALTER TABLE monitors ADD COLUMN body_match TEXT`,
-  `ALTER TABLE monitors ADD COLUMN expected_status INTEGER`,
-  `ALTER TABLE monitors ADD COLUMN json_path TEXT`,
-  `ALTER TABLE monitors ADD COLUMN json_expected TEXT`,
-  `ALTER TABLE monitors ADD COLUMN auth_type TEXT`,
-  `ALTER TABLE monitors ADD COLUMN auth_user TEXT`,
-  `ALTER TABLE monitors ADD COLUMN auth_pass TEXT`,
-  `ALTER TABLE monitors ADD COLUMN auth_token TEXT`,
-  `ALTER TABLE monitors ADD COLUMN request_headers TEXT`,
+  `ALTER TABLE monitors      ADD COLUMN degraded_threshold INTEGER`,
+  `ALTER TABLE monitors      ADD COLUMN alert_config TEXT NOT NULL DEFAULT '{}'`,
+  `ALTER TABLE monitors      ADD COLUMN body_match TEXT`,
+  `ALTER TABLE monitors      ADD COLUMN expected_status INTEGER`,
+  `ALTER TABLE monitors      ADD COLUMN json_path TEXT`,
+  `ALTER TABLE monitors      ADD COLUMN json_expected TEXT`,
+  `ALTER TABLE monitors      ADD COLUMN auth_type TEXT`,
+  `ALTER TABLE monitors      ADD COLUMN auth_user TEXT`,
+  `ALTER TABLE monitors      ADD COLUMN auth_pass TEXT`,
+  `ALTER TABLE monitors      ADD COLUMN auth_token TEXT`,
+  `ALTER TABLE monitors      ADD COLUMN request_headers TEXT`,
+  `ALTER TABLE check_history ADD COLUMN maintenance_event_id TEXT`,
+  `ALTER TABLE alerts         ADD COLUMN maintenance_event_id TEXT`,
 ]) {
   try { db.exec(sql); } catch { /* column already exists */ }
 }
@@ -157,15 +187,37 @@ export function rowToMonitor(row) {
 
 export function rowToAlert(row) {
   return {
-    id:             row.id,
-    monitorId:      row.monitor_id,
-    monitorLabel:   row.monitor_label  ?? null,
-    target:         row.monitor_target ?? null,
-    type:           row.type,
-    startedAt:      row.started_at,
-    lastOccurredAt: row.last_occurred_at,
-    resolvedAt:     row.resolved_at  ?? null,
-    dismissedAt:    row.dismissed_at ?? null,
+    id:                 row.id,
+    monitorId:          row.monitor_id,
+    monitorLabel:       row.monitor_label  ?? null,
+    target:             row.monitor_target ?? null,
+    type:               row.type,
+    startedAt:          row.started_at,
+    lastOccurredAt:     row.last_occurred_at,
+    resolvedAt:         row.resolved_at        ?? null,
+    dismissedAt:        row.dismissed_at       ?? null,
+    maintenanceEventId: row.maintenance_event_id ?? null,
+  };
+}
+
+export function rowToGroup(row) {
+  return {
+    id:           row.id,
+    name:         row.name,
+    displayOrder: row.display_order,
+    createdAt:    row.created_at,
+  };
+}
+
+export function rowToMaintenanceEvent(row) {
+  return {
+    id:        row.id,
+    name:      row.name,
+    note:      row.note,
+    startAt:   row.start_at,
+    endAt:     row.end_at,
+    createdAt: row.created_at,
+    monitorIds: row.monitor_ids ? JSON.parse(row.monitor_ids) : [],
   };
 }
 

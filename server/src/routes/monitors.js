@@ -66,16 +66,17 @@ function bucketRows(rows, bucketMinutes) {
 
 function rowsToRaw(rows) {
   return rows.map(r => ({
-    timestamp:  r.checked_at,
-    ping:       r.total_ms,
-    status:     r.status,
-    dnsMs:      r.dns_ms,
-    tcpMs:      r.tcp_ms,
-    tlsMs:      r.tls_ms,
-    ttfbMs:     r.ttfb_ms,
-    httpStatus: r.http_status,
-    certDays:   r.cert_days,
-    error:      r.error,
+    timestamp:          r.checked_at,
+    ping:               r.total_ms,
+    status:             r.status,
+    dnsMs:              r.dns_ms,
+    tcpMs:              r.tcp_ms,
+    tlsMs:              r.tls_ms,
+    ttfbMs:             r.ttfb_ms,
+    httpStatus:         r.http_status,
+    certDays:           r.cert_days,
+    error:              r.error,
+    maintenanceEventId: r.maintenance_event_id ?? null,
   }));
 }
 
@@ -87,7 +88,7 @@ function rowsToRaw(rows) {
 function getWindowedHistory(monitorId, window, from = null, to = null) {
   const historyQuery = db.prepare(`
     SELECT checked_at, status, total_ms, dns_ms, tcp_ms, tls_ms,
-           ttfb_ms, http_status, cert_days, error
+           ttfb_ms, http_status, cert_days, error, maintenance_event_id
     FROM   check_history
     WHERE  monitor_id = ? AND checked_at >= ? AND checked_at <= ?
     ORDER  BY checked_at ASC
@@ -109,7 +110,7 @@ function getWindowedHistory(monitorId, window, from = null, to = null) {
   const cutoffIso = new Date(Date.now() - cfg.ms).toISOString();
   const rows = db.prepare(`
     SELECT checked_at, status, total_ms, dns_ms, tcp_ms, tls_ms,
-           ttfb_ms, http_status, cert_days, error
+           ttfb_ms, http_status, cert_days, error, maintenance_event_id
     FROM   check_history
     WHERE  monitor_id = ? AND checked_at >= ?
     ORDER  BY checked_at ASC
@@ -143,7 +144,7 @@ function buildMonitorPayload(id, window = '1h', from = null, to = null) {
   // the timing breakdown row shown beneath the card header
   const latestRaw = db.prepare(`
     SELECT checked_at, status, total_ms, dns_ms, tcp_ms, tls_ms,
-           ttfb_ms, http_status, cert_days, error
+           ttfb_ms, http_status, cert_days, error, maintenance_event_id
     FROM   check_history
     WHERE  monitor_id = ?
     ORDER  BY checked_at DESC
@@ -168,6 +169,7 @@ function buildMonitorPayload(id, window = '1h', from = null, to = null) {
       error:      latestRaw.error ?? null,
     } : null,
     history,
+    groupId: db.prepare('SELECT group_id FROM monitor_groups WHERE monitor_id = ?').get(id)?.group_id ?? null,
   };
 }
 

@@ -52,7 +52,7 @@ function shouldRepeatNotify(notifyMode, notifiedAt) {
 
 // ── Alert state machine ───────────────────────────────────────────────────────
 
-function handleAlertLogic(monitor, result, now) {
+function handleAlertLogic(monitor, result, now, maintenanceEventId = null) {
   const cfg    = parseAlertConfig(monitor);
   const isDown = result.status === 'down';
   const isDegraded = !isDown
@@ -93,9 +93,9 @@ function handleAlertLogic(monitor, result, now) {
 
       const id = randomUUID();
       db.prepare(`
-        INSERT INTO alerts (id, monitor_id, type, started_at, last_occurred_at)
-        VALUES (?, ?, 'outage', ?, ?)
-      `).run(id, monitor.id, now, now);
+        INSERT INTO alerts (id, monitor_id, type, started_at, last_occurred_at, maintenance_event_id)
+        VALUES (?, ?, 'outage', ?, ?, ?)
+      `).run(id, monitor.id, now, now, maintenanceEventId);
 
       if (cfg.outage.notify !== 'never') {
         dispatchAlerts(monitor, 'down').catch(console.error);
@@ -130,9 +130,9 @@ function handleAlertLogic(monitor, result, now) {
 
       const id = randomUUID();
       db.prepare(`
-        INSERT INTO alerts (id, monitor_id, type, started_at, last_occurred_at)
-        VALUES (?, ?, 'degraded', ?, ?)
-      `).run(id, monitor.id, now, now);
+        INSERT INTO alerts (id, monitor_id, type, started_at, last_occurred_at, maintenance_event_id)
+        VALUES (?, ?, 'degraded', ?, ?, ?)
+      `).run(id, monitor.id, now, now, maintenanceEventId);
 
       if (cfg.degraded.notify !== 'never') {
         dispatchAlerts(monitor, 'degraded').catch(console.error);
@@ -160,26 +160,36 @@ export async function executeCheck(monitor) {
   const result    = await runCheck(monitor);
   const checkedAt = new Date().toISOString();
 
+  // Check if this monitor is currently in an active maintenance window
+  const activeMaintenance = db.prepare(`
+    SELECT me.id FROM maintenance_events me
+    JOIN maintenance_monitors mm ON mm.event_id = me.id
+    WHERE mm.monitor_id = ? AND me.start_at <= ? AND me.end_at >= ?
+    LIMIT 1
+  `).get(monitor.id, checkedAt, checkedAt);
+  const maintenanceEventId = activeMaintenance?.id ?? null;
+
   // Persist result
   db.prepare(`
     INSERT INTO check_history
       (monitor_id, checked_at, status, total_ms, dns_ms, tcp_ms,
-       tls_ms, ttfb_ms, http_status, cert_days, error)
+       tls_ms, ttfb_ms, http_status, cert_days, error, maintenance_event_id)
     VALUES
       (@monitorId, @checkedAt, @status, @totalMs, @dnsMs, @tcpMs,
-       @tlsMs, @ttfbMs, @httpStatus, @certDays, @error)
+       @tlsMs, @ttfbMs, @httpStatus, @certDays, @error, @maintenanceEventId)
   `).run({
-    monitorId:  monitor.id,
+    monitorId:          monitor.id,
     checkedAt,
-    status:     result.status,
-    totalMs:    result.totalMs    ?? null,
-    dnsMs:      result.dnsMs      ?? null,
-    tcpMs:      result.tcpMs      ?? null,
-    tlsMs:      result.tlsMs      ?? null,
-    ttfbMs:     result.ttfbMs     ?? null,
-    httpStatus: result.httpStatus ?? null,
-    certDays:   result.certDays   ?? null,
-    error:      result.error ? result.error.slice(0, 256) : null,
+    status:             result.status,
+    totalMs:            result.totalMs    ?? null,
+    dnsMs:              result.dnsMs      ?? null,
+    tcpMs:              result.tcpMs      ?? null,
+    tlsMs:              result.tlsMs      ?? null,
+    ttfbMs:             result.ttfbMs     ?? null,
+    httpStatus:         result.httpStatus ?? null,
+    certDays:           result.certDays   ?? null,
+    error:              result.error ? result.error.slice(0, 256) : null,
+    maintenanceEventId,
   });
 
   // Uptime % from the last hour — matches the 1h window the GET endpoint uses by default.
@@ -201,7 +211,7 @@ export async function executeCheck(monitor) {
 
   // Alert logic (skip reference monitors)
   if (!monitor.tags?.includes('_ref')) {
-    handleAlertLogic(monitor, result, checkedAt);
+    handleAlertLogic(monitor, result, checkedAt, maintenanceEventId);
   }
 
   // Push real-time update to all connected browsers
@@ -221,9 +231,10 @@ export async function executeCheck(monitor) {
       certDays:   result.certDays   ?? null,
     },
     newPoint: {
-      timestamp: checkedAt,
-      ping:      result.totalMs ?? null,
-      status:    result.status,
+      timestamp:          checkedAt,
+      ping:               result.totalMs ?? null,
+      status:             result.status,
+      maintenanceEventId: maintenanceEventId ?? null,
     },
   });
 

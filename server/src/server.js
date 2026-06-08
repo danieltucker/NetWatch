@@ -11,6 +11,8 @@ import toolsRouter            from './routes/tools.js';
 import keysRouter             from './routes/keys.js';
 import oauthRouter            from './routes/oauth.js';
 import v1Router               from './routes/v1.js';
+import groupsRouter           from './routes/groups.js';
+import maintenanceRouter      from './routes/maintenance.js';
 import { loadModules, registry } from './modules/registry.js';
 import { initReportScheduler }  from './report-scheduler.js';
 
@@ -63,6 +65,8 @@ app.use('/api/tools',            toolsRouter);
 app.use('/api/keys',             keysRouter);
 app.use('/api/oauth',            oauthRouter);
 app.use('/api/v1',               v1Router);
+app.use('/api/groups',           groupsRouter);
+app.use('/api/maintenance',      maintenanceRouter);
 
 // Fallback: let the React router handle all non-API paths
 app.get('*', (_req, res) => {

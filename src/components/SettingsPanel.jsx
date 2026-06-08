@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronLeft, Send, CheckCircle, AlertCircle, Loader, Bell, Settings2, SlidersHorizontal, Puzzle, ExternalLink, FileBarChart2, Plus, Wifi, Globe, Terminal, Key, Copy, RefreshCw, Trash2 } from 'lucide-react';
+import { X, ChevronLeft, Send, CheckCircle, AlertCircle, Loader, Bell, Settings2, SlidersHorizontal, Puzzle, ExternalLink, FileBarChart2, Plus, Wifi, Globe, Terminal, Key, Copy, RefreshCw, Trash2, Layers, Edit2 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { moduleRegistry } from '../modules/index.js';
 import { NETWORK_REF_PRESETS, DEFAULT_NETWORK_REFS_ENABLED } from '../types/networkRefs.js';
@@ -21,6 +21,7 @@ const TABS = [
   { id: 'notifications', label: 'Notifications',  Icon: Bell           },
   { id: 'reports',       label: 'Reports',        Icon: FileBarChart2  },
   { id: 'network',       label: 'Network',        Icon: Wifi           },
+  { id: 'groups',        label: 'Groups',         Icon: Layers         },
   { id: 'modules',       label: 'Modules',        Icon: Puzzle         },
   { id: 'api-keys',      label: 'API Keys',       Icon: Key            },
 ];
@@ -249,11 +250,11 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
 
   const activeTabDef = TABS.find(tab => tab.id === activeTab);
   const contentSubtitle =
-    activeTab === 'appearance'    ? 'Theme and visual preferences'              :
     activeTab === 'general'       ? 'Dashboard-wide display preferences'        :
     activeTab === 'notifications' ? 'Configure alert delivery channels'         :
     activeTab === 'reports'       ? 'Schedule periodic email status reports'    :
     activeTab === 'network'       ? 'Configure network reference monitors'      :
+    activeTab === 'groups'        ? 'Organise monitors into named groups'       :
     activeTab === 'api-keys'      ? 'Manage API keys for external integrations' :
                                     'Install modules and manage credentials';
 
@@ -338,7 +339,7 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
           {/* Version label — desktop only */}
           <div className="hidden sm:block px-5 py-5">
             <div className="text-xs wt-mono" style={{ color: t.textFaint }}>
-              NetWatch v6.7.0
+              NetWatch v6.8.1
             </div>
           </div>
         </aside>
@@ -415,6 +416,9 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
                 setNetworkRefsCustom={setNetworkRefsCustom}
                 t={t}
               />
+            )}
+            {activeTab === 'groups' && (
+              <GroupsTab t={t} />
             )}
             {activeTab === 'modules' && (
               <ModulesTab
@@ -1823,6 +1827,179 @@ function ApiKeysTab({ t }) {
         </div>
       </div>
 
+    </div>
+  );
+}
+
+// ── Groups tab ────────────────────────────────────────────────────────────────
+
+function GroupsTab({ t }) {
+  const [groups,   setGroups]   = useState([]);
+  const [monitors, setMonitors] = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [newName,  setNewName]  = useState('');
+  const [editId,   setEditId]   = useState(null);
+  const [editName, setEditName] = useState('');
+  const [expandedId, setExpandedId] = useState(null);
+
+  const load = () => {
+    Promise.all([
+      fetch('/api/groups').then(r => r.json()),
+      fetch('/api/monitors?window=1h').then(r => r.json()),
+    ]).then(([g, m]) => {
+      setGroups(g);
+      setMonitors(m.filter(mon => !mon.tags?.includes('_ref')));
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const create = async () => {
+    if (!newName.trim()) return;
+    await fetch('/api/groups', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName.trim() }),
+    });
+    setNewName('');
+    load();
+  };
+
+  const rename = async (id) => {
+    if (!editName.trim()) return;
+    await fetch(`/api/groups/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: editName.trim() }),
+    });
+    setEditId(null);
+    load();
+  };
+
+  const remove = async (id) => {
+    if (!window.confirm('Delete this group? Monitors will become ungrouped.')) return;
+    await fetch(`/api/groups/${id}`, { method: 'DELETE' });
+    load();
+  };
+
+  const setMonitorIds = async (groupId, monitorIds) => {
+    await fetch(`/api/groups/${groupId}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ monitorIds }),
+    });
+    load();
+  };
+
+  if (loading) return (
+    <div className="py-12 text-center text-xs wt-mono" style={{ color: t.textFaint }}>Loading…</div>
+  );
+
+  return (
+    <div className="space-y-4">
+      {/* Create group */}
+      <div className="rounded-xl border overflow-hidden" style={{ borderColor: t.cardBorder }}>
+        <div className="px-5 py-3 border-b" style={{ backgroundColor: 'var(--wt-surface-2)', borderColor: t.cardBorder }}>
+          <div className="text-xs wt-mono font-semibold uppercase tracking-wider" style={{ color: t.textSecondary }}>
+            Create Group
+          </div>
+        </div>
+        <div className="px-5 py-4 flex gap-2" style={{ backgroundColor: t.cardBg }}>
+          <input
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && create()}
+            placeholder="Group name (e.g. Production, Staging)"
+            className="flex-1 wt-input wt-mono"
+          />
+          <button onClick={create} disabled={!newName.trim()} className="wt-btn wt-btn--primary disabled:opacity-50">
+            <Plus size={13} /> Create
+          </button>
+        </div>
+      </div>
+
+      {/* Group list */}
+      {groups.length === 0 ? (
+        <div className="py-10 text-center text-xs wt-mono" style={{ color: t.textFaint }}>
+          No groups yet — create one above
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {groups.map(group => {
+            const isExpanded = expandedId === group.id;
+            const groupMonitors = monitors.filter(m => group.monitorIds?.includes(m.id));
+            return (
+              <div key={group.id} className="rounded-xl border overflow-hidden" style={{ borderColor: t.cardBorder }}>
+                {/* Header */}
+                <div className="flex items-center gap-3 px-5 py-3"
+                  style={{ backgroundColor: 'var(--wt-surface-2)', borderBottom: `1px solid ${t.cardBorder}` }}>
+                  {editId === group.id ? (
+                    <input
+                      autoFocus
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') rename(group.id); if (e.key === 'Escape') setEditId(null); }}
+                      className="flex-1 wt-input wt-mono"
+                    />
+                  ) : (
+                    <span className="flex-1 text-sm wt-mono font-semibold" style={{ color: t.textPrimary }}>
+                      {group.name}
+                    </span>
+                  )}
+                  <span className="wt-mono text-xs" style={{ color: t.textFaint }}>
+                    {groupMonitors.length} monitor{groupMonitors.length !== 1 ? 's' : ''}
+                  </span>
+                  {editId === group.id ? (
+                    <>
+                      <button onClick={() => rename(group.id)} className="wt-btn wt-btn--ghost wt-btn--sm" style={{ color: 'var(--wt-up-600)' }}><Check size={13} /></button>
+                      <button onClick={() => setEditId(null)} className="wt-btn wt-btn--ghost wt-btn--sm"><X size={13} /></button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => setExpandedId(isExpanded ? null : group.id)}
+                        className="wt-btn wt-btn--ghost wt-btn--sm text-xs wt-mono"
+                        style={{ color: t.textMuted }}>
+                        {isExpanded ? 'Done' : 'Manage'}
+                      </button>
+                      <button onClick={() => { setEditId(group.id); setEditName(group.name); }}
+                        className="wt-btn wt-btn--ghost wt-btn--sm"><Edit2 size={13} /></button>
+                      <button onClick={() => remove(group.id)}
+                        className="wt-btn wt-btn--ghost wt-btn--sm" style={{ color: 'var(--wt-down-500)' }}>
+                        <Trash2 size={13} />
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {/* Monitor list when expanded */}
+                {isExpanded && (
+                  <div className="divide-y" style={{ borderColor: t.cardBorder, backgroundColor: t.cardBg }}>
+                    {monitors.length === 0 ? (
+                      <p className="px-5 py-3 text-xs wt-mono" style={{ color: t.textFaint }}>No monitors configured</p>
+                    ) : monitors.map(m => {
+                      const isMember = group.monitorIds?.includes(m.id);
+                      return (
+                        <label key={m.id} className="flex items-center gap-3 px-5 py-2.5 cursor-pointer transition-colors"
+                          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--wt-surface-2)'}
+                          onMouseLeave={e => e.currentTarget.style.backgroundColor = ''}>
+                          <input type="checkbox" checked={isMember}
+                            onChange={() => {
+                              const next = isMember
+                                ? group.monitorIds.filter(id => id !== m.id)
+                                : [...(group.monitorIds ?? []), m.id];
+                              setMonitorIds(group.id, next);
+                            }}
+                            className="w-3.5 h-3.5 rounded" />
+                          <span className="flex-1 text-sm" style={{ color: t.textPrimary }}>{m.label}</span>
+                          <span className="wt-mono text-xs" style={{ color: t.textFaint }}>{m.target}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

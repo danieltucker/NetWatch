@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Radio, Activity, AlertTriangle, Bell, Tag as TagIcon, Settings, Code, X, Menu, Search, Zap, Calendar, LayoutGrid, List, AlertCircle as IncidentIcon } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { Plus, Radio, Activity, AlertTriangle, Bell, Tag as TagIcon, Settings, Code, X, Menu, Search, Zap, Calendar, LayoutGrid, List, AlertCircle as IncidentIcon, Wrench, Layers } from 'lucide-react';
 import {
   DndContext, closestCenter,
   KeyboardSensor, PointerSensor,
@@ -25,6 +26,7 @@ import { MonitorForm }         from './components/MonitorForm';
 import { ModuleInstanceForm }  from './components/ModuleInstanceForm';
 import { AlertsBanner }        from './components/AlertsBanner';
 import { IncidentsPage }       from './components/IncidentsPage';
+import { MaintenancePage }     from './components/MaintenancePage';
 import { SettingsPanel }       from './components/SettingsPanel';
 import { EmbedModal }          from './components/EmbedModal';
 import { MonitorDetailModal }  from './components/MonitorDetailModal';
@@ -32,7 +34,7 @@ import { moduleRegistry }      from './modules/index.js';
 
 // ── Sortable card wrapper ─────────────────────────────────────────────────────
 
-function SortableMonitorCard({ monitor, onEdit, onCardClick, onIncidentClick, width, sortEnabled, chartYMax }) {
+function SortableMonitorCard({ monitor, onEdit, onCardClick, onIncidentClick, width, sortEnabled, chartYMax, inMaintenance }) {
   const id = String(monitor.id);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
@@ -54,6 +56,7 @@ function SortableMonitorCard({ monitor, onEdit, onCardClick, onIncidentClick, wi
         dragHandleProps={sortEnabled ? { ...attributes, ...listeners } : undefined}
         isDragging={isDragging}
         chartYMax={chartYMax}
+        inMaintenance={inMaintenance}
       />
     </div>
   );
@@ -143,9 +146,12 @@ export default function App() {
   const [tagFilter,      setTagFilter]      = useState([]);
   const [searchQuery,    setSearchQuery]    = useState('');
   const [statusFilter,   setStatusFilter]   = useState('all');
-  const [alertsExpanded, setAlertsExpanded] = useState(false);
-  const [view,           setView]           = useState('monitors'); // 'monitors' | 'incidents'
-  const [viewMode,       setViewMode]       = useState('grid');     // 'grid' | 'list'
+  const [alertsExpanded,          setAlertsExpanded]          = useState(false);
+  const [view,                    setView]                    = useState('monitors'); // 'monitors' | 'incidents' | 'maintenance'
+  const [viewMode,                setViewMode]                = useState('grid');     // 'grid' | 'list'
+  const [groupByEnabled,          setGroupByEnabled]          = useState(false);
+  const [groups,                  setGroups]                  = useState([]);
+  const [maintenanceMonitorIds,   setMaintenanceMonitorIds]   = useState(new Set());
   const [sortBy,         setSortBy]         = useState('default');
   const [showSettings,    setShowSettings]    = useState(false);
   const [embedMonitor,    setEmbedMonitor]    = useState(null);
@@ -170,6 +176,27 @@ export default function App() {
       try { localStorage.setItem('nw-history-range', JSON.stringify(historyRange)); } catch {}
     }
   }, [historyRange]);
+
+  // ── Fetch groups ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    fetch('/api/groups').then(r => r.json()).then(setGroups).catch(() => {});
+  }, []);
+
+  // ── Poll active maintenance windows every minute ──────────────────────────
+  useEffect(() => {
+    const load = () => {
+      fetch('/api/maintenance/active')
+        .then(r => r.json())
+        .then(events => {
+          const ids = new Set(events.flatMap(e => e.monitorIds ?? []));
+          setMaintenanceMonitorIds(ids);
+        })
+        .catch(() => {});
+    };
+    load();
+    const timer = setInterval(load, 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
 
   // ── Derived data ──────────────────────────────────────────────────────────
@@ -338,16 +365,34 @@ export default function App() {
         <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em', color: 'var(--wt-text)' }}>
           Net<span style={{ color: 'var(--nw-ink)' }}>Watch</span>
         </span>
-        <span className="wt-chip wt-chip--plain">v6.7.0</span>
+        <span className="wt-chip wt-chip--plain">v6.8.1</span>
 
         <div className="flex items-center gap-2" style={{ marginLeft: 'auto' }}>
-          {/* live indicator */}
+          {/* live / offline indicator */}
           <div className="hidden wide:flex items-center gap-1.5 mr-1">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full" style={{ backgroundColor: 'var(--wt-up-500)', opacity: 0.5 }} />
-              <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: 'var(--wt-up-500)' }} />
-            </span>
-            <span className="wt-mono text-xs" style={{ color: 'var(--wt-text-faint)' }}>live</span>
+            {error ? (
+              <>
+                <span className="relative flex h-2 w-2">
+                  <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: 'var(--wt-down-500)' }} />
+                </span>
+                <span className="wt-mono text-xs" style={{ color: 'var(--wt-down-600)' }}>offline</span>
+              </>
+            ) : loading ? (
+              <>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-pulse relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: 'var(--wt-n-400)' }} />
+                </span>
+                <span className="wt-mono text-xs" style={{ color: 'var(--wt-text-faint)' }}>connecting</span>
+              </>
+            ) : (
+              <>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full" style={{ backgroundColor: 'var(--wt-up-500)', opacity: 0.5 }} />
+                  <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: 'var(--wt-up-500)' }} />
+                </span>
+                <span className="wt-mono text-xs" style={{ color: 'var(--wt-text-faint)' }}>live</span>
+              </>
+            )}
           </div>
 
           {/* search — desktop */}
@@ -422,6 +467,16 @@ export default function App() {
             </span>
           )}
         </button>
+        <button className={`side__item ${view === 'maintenance' ? 'is-active' : ''}`}
+          onClick={() => { setView('maintenance'); setMobileMenuOpen(false); }}>
+          <Wrench size={12} style={{ flexShrink: 0 }} />
+          <span>Maintenance</span>
+          {maintenanceMonitorIds.size > 0 && (
+            <span className="side__item__count" style={{ color: 'var(--wt-viz-5)' }}>
+              {maintenanceMonitorIds.size}
+            </span>
+          )}
+        </button>
 
         {/* TAGS */}
         {allTags.length > 0 && (
@@ -478,6 +533,10 @@ export default function App() {
           />
         )}
 
+        {!loading && !error && view === 'maintenance' && (
+          <MaintenancePage monitors={monitors} />
+        )}
+
         {!loading && !error && view === 'monitors' && (
           <>
             {userMonitors.length > 0 && <SummaryBar monitors={userMonitors} />}
@@ -489,17 +548,24 @@ export default function App() {
                 {userMonitors.length > 0 && (
                   <div className="flex items-center gap-0.5">
                     <button
+                      onClick={() => setGroupByEnabled(p => !p)}
+                      className="wt-btn wt-btn--ghost wt-btn--sm"
+                      title="Group by"
+                      style={groupByEnabled ? { color: 'var(--wt-brand-500)', background: 'color-mix(in oklch, var(--wt-brand-500) 10%, transparent)' } : undefined}>
+                      <Layers size={14} />
+                    </button>
+                    <button
                       onClick={() => setViewMode('grid')}
                       className="wt-btn wt-btn--ghost wt-btn--sm"
                       title="Card view"
-                      style={viewMode === 'grid' ? { color: 'var(--nw-ink)', background: 'color-mix(in oklch, var(--nw-ink) 12%, transparent)' } : undefined}>
+                      style={viewMode === 'grid' ? { color: 'var(--wt-brand-500)', background: 'color-mix(in oklch, var(--wt-brand-500) 10%, transparent)' } : undefined}>
                       <LayoutGrid size={14} />
                     </button>
                     <button
                       onClick={() => setViewMode('list')}
                       className="wt-btn wt-btn--ghost wt-btn--sm"
                       title="List view"
-                      style={viewMode === 'list' ? { color: 'var(--nw-ink)', background: 'color-mix(in oklch, var(--nw-ink) 12%, transparent)' } : undefined}>
+                      style={viewMode === 'list' ? { color: 'var(--wt-brand-500)', background: 'color-mix(in oklch, var(--wt-brand-500) 10%, transparent)' } : undefined}>
                       <List size={14} />
                     </button>
                   </div>
@@ -520,6 +586,17 @@ export default function App() {
                 onEdit={mon => openDetail(mon, 'configure')}
                 t={t}
               />
+            ) : groupByEnabled ? (
+              <GroupedMonitorView
+                monitors={filteredMonitors}
+                groups={groups}
+                maintenanceMonitorIds={maintenanceMonitorIds}
+                onEdit={mon => openDetail(mon, 'configure')}
+                onCardClick={mon => openDetail(mon, 'history')}
+                onIncidentClick={handleIncidentClick}
+                getWidth={getWidth}
+                chartYMax={chartYMax}
+              />
             ) : (
               <DndContext
                 sensors={sensors}
@@ -539,6 +616,7 @@ export default function App() {
                         width={getWidth(m.id)}
                         sortEnabled={sortEnabled}
                         chartYMax={chartYMax}
+                        inMaintenance={maintenanceMonitorIds.has(m.id)}
                       />
                     ))}
                   </div>
@@ -727,6 +805,63 @@ function MonitorListView({ monitors, onCardClick, onEdit, t }) {
   );
 }
 
+// ── Grouped monitor view ──────────────────────────────────────────────────────
+
+function GroupedMonitorView({ monitors, groups, maintenanceMonitorIds, onEdit, onCardClick, onIncidentClick, getWidth, chartYMax }) {
+  // Build group buckets
+  const grouped = groups.map(g => ({
+    ...g,
+    monitors: monitors.filter(m => g.monitorIds?.includes(m.id)),
+  })).filter(g => g.monitors.length > 0);
+
+  const groupedIds = new Set(groups.flatMap(g => g.monitorIds ?? []));
+  const ungrouped  = monitors.filter(m => !groupedIds.has(m.id));
+
+  const renderGrid = (items) => (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+      {items.map(m => (
+        <MonitorCard
+          key={m.id}
+          monitor={m}
+          onEdit={onEdit}
+          onCardClick={onCardClick}
+          onIncidentClick={onIncidentClick}
+          width={getWidth(m.id)}
+          chartYMax={chartYMax}
+          inMaintenance={maintenanceMonitorIds.has(m.id)}
+        />
+      ))}
+    </div>
+  );
+
+  return (
+    <div>
+      {grouped.map(g => (
+        <div key={g.id}>
+          <div className="flex items-center gap-2 mb-3 mt-2">
+            <span className="wt-eyebrow">{g.name}</span>
+            <span className="wt-mono text-[11px]" style={{ color: 'var(--wt-text-faint)' }}>{g.monitors.length}</span>
+            <div className="flex-1 h-px" style={{ backgroundColor: 'var(--wt-border)' }} />
+          </div>
+          {renderGrid(g.monitors)}
+        </div>
+      ))}
+      {ungrouped.length > 0 && (
+        <div>
+          {grouped.length > 0 && (
+            <div className="flex items-center gap-2 mb-3 mt-2">
+              <span className="wt-eyebrow">Ungrouped</span>
+              <span className="wt-mono text-[11px]" style={{ color: 'var(--wt-text-faint)' }}>{ungrouped.length}</span>
+              <div className="flex-1 h-px" style={{ backgroundColor: 'var(--wt-border)' }} />
+            </div>
+          )}
+          {renderGrid(ungrouped)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Toolbar sub-components ────────────────────────────────────────────────────
 
 function MonitorSearch({ value, onChange }) {
@@ -776,15 +911,32 @@ const SEG_WINDOWS = [
 ];
 
 function HistoryRangeControl({ historyRange, onChange, t, isDark }) {
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [draftFrom,  setDraftFrom]  = useState('');
-  const [draftTo,    setDraftTo]    = useState('');
-  const wrapRef = useRef(null);
+  const [pickerOpen,  setPickerOpen]  = useState(false);
+  const [draftFrom,   setDraftFrom]   = useState('');
+  const [draftTo,     setDraftTo]     = useState('');
+  const [pickerPos,   setPickerPos]   = useState({ top: 0, left: 0 });
+  const wrapRef    = useRef(null);
+  const calBtnRef  = useRef(null);
+  const pickerRef  = useRef(null);
+
+  // Position picker below the calendar button using fixed coords to escape
+  // the sidebar's overflow:auto clipping context.
+  const openPicker = () => {
+    if (calBtnRef.current) {
+      const r = calBtnRef.current.getBoundingClientRect();
+      setPickerPos({ top: r.bottom + 6, left: r.left });
+    }
+    setPickerOpen(true);
+  };
 
   useEffect(() => {
     if (!pickerOpen) return;
-    const onMouse = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setPickerOpen(false); };
-    const onKey   = (e) => { if (e.key === 'Escape') setPickerOpen(false); };
+    const onMouse = (e) => {
+      const inWrap   = wrapRef.current?.contains(e.target);
+      const inPicker = pickerRef.current?.contains(e.target);
+      if (!inWrap && !inPicker) setPickerOpen(false);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setPickerOpen(false); };
     document.addEventListener('mousedown', onMouse);
     document.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('mousedown', onMouse); document.removeEventListener('keydown', onKey); };
@@ -825,7 +977,8 @@ function HistoryRangeControl({ historyRange, onChange, t, isDark }) {
             </button>
           ))}
         </div>
-        <button onClick={() => setPickerOpen(p => !p)} className="wt-btn wt-btn--ghost wt-btn--sm" title="Custom range"
+        <button ref={calBtnRef} onClick={() => pickerOpen ? setPickerOpen(false) : openPicker()}
+          className="wt-btn wt-btn--ghost wt-btn--sm" title="Custom range"
           style={isRangeActive ? { color: 'var(--nw-ink)', background: 'color-mix(in oklch, var(--nw-ink) 12%, transparent)' } : undefined}>
           <Calendar size={14} />
         </button>
@@ -839,10 +992,14 @@ function HistoryRangeControl({ historyRange, onChange, t, isDark }) {
         </div>
       )}
 
-      {pickerOpen && (
-        <div className="absolute top-full left-0 mt-1.5 z-30 rounded-lg border shadow-2xl p-3 space-y-2"
-          style={{ backgroundColor: t.cardBg, borderColor: t.cardBorder, minWidth: 240,
-            boxShadow: isDark ? '0 16px 48px rgba(0,0,0,0.6)' : '0 16px 48px rgba(0,0,0,0.15)' }}>
+      {pickerOpen && createPortal(
+        <div ref={pickerRef} className="rounded-lg border p-3 space-y-2"
+          style={{
+            position: 'fixed', top: pickerPos.top, left: pickerPos.left,
+            zIndex: 9999, minWidth: 260,
+            backgroundColor: t.cardBg, borderColor: t.cardBorder,
+            boxShadow: isDark ? '0 16px 48px rgba(0,0,0,0.6)' : '0 16px 48px rgba(0,0,0,0.15)',
+          }}>
           <div className="wt-eyebrow">Custom range</div>
           <div className="wt-field">
             <label className="wt-label" style={{ fontSize: 11 }}>From</label>
@@ -856,7 +1013,8 @@ function HistoryRangeControl({ historyRange, onChange, t, isDark }) {
             style={{ width: '100%', justifyContent: 'center', opacity: (!draftFrom || !draftTo) ? 0.4 : 1 }}>
             Apply range
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

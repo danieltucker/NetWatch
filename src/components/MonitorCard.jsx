@@ -1,7 +1,7 @@
 import React, { useRef, useMemo, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { AreaChart, Area, YAxis, ReferenceLine, ResponsiveContainer, Tooltip } from 'recharts';
-import { Edit2, Tag, ShieldCheck, ShieldAlert, ExternalLink } from 'lucide-react';
+import { Edit2, Tag, ShieldCheck, ShieldAlert, ExternalLink, Wrench } from 'lucide-react';
 import { formatInterval, formatTimestamp, certDaysColor } from '../types/monitor';
 import { useTheme } from '../hooks/useTheme';
 import { StatusPill, StatusDot } from './StatusIndicators';
@@ -119,8 +119,14 @@ function SparkTooltip({ active, payload, coordinate, containerRef, chart }) {
 // Down-event dot on sparkline
 // ---------------------------------------------------------------------------
 
+// Maintenance purple — matches wt-viz-5 categorical ramp
+const MAINT_COLOR = 'var(--wt-viz-5)';
+
 const SparkDot = ({ cx, cy, payload, index, onZoom, downColor }) => {
   if (!cx || !cy) return null;
+  if (payload?.maintenanceEventId) {
+    return <circle key={`m-${index}`} cx={cx} cy={cy} r={2.5} fill={MAINT_COLOR} style={{ pointerEvents: 'none' }} />;
+  }
   if (payload?.status === 'down') {
     return (
       <g key={`d-${index}`}>
@@ -222,7 +228,7 @@ function MetricCell({ label, value, unit, valueColor, barPct, barColor, trendTex
 function MonitorCardInner({
   monitor, onEdit, onCardClick, compact = false,
   dragHandleProps, isDragging = false,
-  chartYMax = 'auto', onIncidentClick,
+  chartYMax = 'auto', onIncidentClick, inMaintenance = false,
 }) {
   const { t, isDark } = useTheme();
   const chartRef = useRef(null);
@@ -340,6 +346,13 @@ function MonitorCardInner({
             );
           })()}
           <CheckTypeBadge checkType={monitor.checkType} />
+          {inMaintenance && (
+            <span className="wt-mono text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0"
+              style={{ color: MAINT_COLOR, backgroundColor: `color-mix(in oklch, ${MAINT_COLOR} 12%, transparent)` }}
+              title="Active maintenance window">
+              <Wrench size={9} /> Maint.
+            </span>
+          )}
           {onEdit && (
             <button onClick={e => { e.stopPropagation(); onEdit(monitor); }}
               onPointerDown={e => e.stopPropagation()} title="Edit"
@@ -437,5 +450,6 @@ export const MonitorCard = React.memo(MonitorCardInner, (prev, next) =>
   prev.chartYMax      === next.chartYMax       &&
   prev.isDragging     === next.isDragging      &&
   prev.compact        === next.compact         &&
-  prev.onIncidentClick === next.onIncidentClick
+  prev.onIncidentClick === next.onIncidentClick &&
+  prev.inMaintenance   === next.inMaintenance
 );
