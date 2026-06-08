@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Radio, Activity, AlertTriangle, Bell, Tag as TagIcon, Settings, Code, X, Menu, Search, Zap, Calendar, LayoutGrid, List, AlertCircle as IncidentIcon, Wrench, Layers } from 'lucide-react';
+import { Plus, Radio, Activity, AlertTriangle, Bell, Tag as TagIcon, Settings, Code, X, Menu, Search, Zap, Calendar, LayoutGrid, List, AlertCircle as IncidentIcon, Wrench, Layers, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
 import {
   DndContext, closestCenter,
   KeyboardSensor, PointerSensor,
@@ -118,7 +118,7 @@ export default function App() {
   // Derive a plain window string for cases that still need it (SSE comparison etc.)
   const historyWindow = historyRange.type === 'preset' ? historyRange.value : 'custom';
 
-  const { monitors, loading, error, addMonitor, updateMonitor, deleteMonitor, refresh } =
+  const { monitors, loading, error, sseConnected, addMonitor, updateMonitor, deleteMonitor, refresh } =
     useMonitors(historyWindow, historyRange);
 
   const [alertsAutoOpen, setAlertsAutoOpen] = useState(() => {
@@ -147,9 +147,15 @@ export default function App() {
   const [searchQuery,    setSearchQuery]    = useState('');
   const [statusFilter,   setStatusFilter]   = useState('all');
   const [alertsExpanded,          setAlertsExpanded]          = useState(false);
+  const [sidebarCollapsed,        setSidebarCollapsed]        = useState(() => {
+    try { return localStorage.getItem('nw-sidebar-collapsed') === 'true'; } catch { return false; }
+  });
+  const [sidebarHovered,          setSidebarHovered]          = useState(false);
   const [view,                    setView]                    = useState('monitors'); // 'monitors' | 'incidents' | 'maintenance'
   const [viewMode,                setViewMode]                = useState('grid');     // 'grid' | 'list'
-  const [groupByEnabled,          setGroupByEnabled]          = useState(false);
+  const [groupByEnabled,          setGroupByEnabled]          = useState(() => {
+    try { return localStorage.getItem('nw-group-by') === 'true'; } catch { return false; }
+  });
   const [groups,                  setGroups]                  = useState([]);
   const [maintenanceMonitorIds,   setMaintenanceMonitorIds]   = useState(new Set());
   const [sortBy,         setSortBy]         = useState('default');
@@ -177,10 +183,30 @@ export default function App() {
     }
   }, [historyRange]);
 
-  // ── Fetch groups ──────────────────────────────────────────────────────────
+  // ── Fetch groups — on mount and whenever settings panel closes ───────────
   useEffect(() => {
-    fetch('/api/groups').then(r => r.json()).then(setGroups).catch(() => {});
-  }, []);
+    if (!showSettings) {
+      fetch('/api/groups').then(r => r.json()).then(setGroups).catch(() => {});
+    }
+  }, [showSettings]);
+
+  const handleMoveGroup = async (groupId, direction) => {
+    const sorted = [...groups].sort((a, b) => a.displayOrder - b.displayOrder);
+    const idx = sorted.findIndex(g => g.id === groupId);
+    if (idx === -1) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+    const a = sorted[idx], b = sorted[swapIdx];
+    setGroups(prev => prev.map(g => {
+      if (g.id === a.id) return { ...g, displayOrder: b.displayOrder };
+      if (g.id === b.id) return { ...g, displayOrder: a.displayOrder };
+      return g;
+    }));
+    await Promise.all([
+      fetch(`/api/groups/${a.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ displayOrder: b.displayOrder }) }),
+      fetch(`/api/groups/${b.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ displayOrder: a.displayOrder }) }),
+    ]);
+  };
 
   // ── Poll active maintenance windows every minute ──────────────────────────
   useEffect(() => {
@@ -340,7 +366,7 @@ export default function App() {
   ];
 
   return (
-    <div className="app">
+    <div className={`app ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
 
       {/* ── Console (always mounted, toggled with `) ─────────────────────────── */}
       <ConsolePanel monitors={monitors} onRefresh={refresh} />
@@ -365,19 +391,19 @@ export default function App() {
         <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em', color: 'var(--wt-text)' }}>
           Net<span style={{ color: 'var(--nw-ink)' }}>Watch</span>
         </span>
-        <span className="wt-chip wt-chip--plain">v6.8.1</span>
+        <span className="wt-chip wt-chip--plain">v6.10.1</span>
 
         <div className="flex items-center gap-2" style={{ marginLeft: 'auto' }}>
           {/* live / offline indicator */}
           <div className="hidden wide:flex items-center gap-1.5 mr-1">
-            {error ? (
+            {(error || sseConnected === false) ? (
               <>
                 <span className="relative flex h-2 w-2">
                   <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: 'var(--wt-down-500)' }} />
                 </span>
                 <span className="wt-mono text-xs" style={{ color: 'var(--wt-down-600)' }}>offline</span>
               </>
-            ) : loading ? (
+            ) : (loading || sseConnected === null) ? (
               <>
                 <span className="relative flex h-2 w-2">
                   <span className="animate-pulse relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: 'var(--wt-n-400)' }} />
@@ -430,7 +456,16 @@ export default function App() {
       </div>
 
       {/* ── Sidebar ── */}
-      <aside className={`app__side ${mobileMenuOpen ? 'is-open' : ''}`}>
+      <aside
+        className={`app__side ${mobileMenuOpen ? 'is-open' : ''} ${sidebarCollapsed && sidebarHovered ? 'is-expanded' : ''}`}
+        onMouseEnter={() => sidebarCollapsed && setSidebarHovered(true)}
+        onMouseLeave={() => setSidebarHovered(false)}>
+        {/* ── Scrollable content area ── */}
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }}>
+
+        {/* Single rendering path — CSS drives collapsed vs expanded appearance.
+            Items stay at identical Y positions in both states so nothing jumps on hover. */}
+
         {/* mobile-only quick actions */}
         <div className="wide:hidden flex items-center gap-2 mb-3">
           <button onClick={() => { openAdd(); setMobileMenuOpen(false); }} className="wt-btn wt-btn--primary wt-btn--sm"><Plus size={14} />Add</button>
@@ -438,13 +473,14 @@ export default function App() {
           <button onClick={() => { setShowSettings(true); setMobileMenuOpen(false); }} className="wt-btn wt-btn--ghost wt-btn--sm" title="Settings"><Settings size={14} /></button>
         </div>
 
-        {/* STATUS */}
+        {/* STATUS — group header kept in DOM (opacity:0 when collapsed) so items below don't shift */}
         <div className="side__group">Status</div>
         {statusRows.map(row => (
-          <button key={row.value} className={`side__item ${statusFilter === row.value ? 'is-active' : ''}`}
+          <button key={row.value}
+            className={`side__item ${statusFilter === row.value ? 'is-active' : ''} ${!row.status ? 'side__item--no-icon' : ''}`}
             onClick={() => { setStatusFilter(row.value); setMobileMenuOpen(false); }}>
-            {row.status ? <StatusDot status={row.status} /> : <span style={{ width: 7, height: 7 }} />}
-            <span>{row.label}</span>
+            {row.status ? <StatusDot status={row.status} /> : <span style={{ width: 7, height: 7, flexShrink: 0 }} />}
+            <span className="side__item__label">{row.label}</span>
             <span className="side__item__count">{row.count}</span>
           </button>
         ))}
@@ -454,13 +490,13 @@ export default function App() {
         <button className={`side__item ${view === 'monitors' ? 'is-active' : ''}`}
           onClick={() => { setView('monitors'); setMobileMenuOpen(false); }}>
           <Activity size={12} style={{ flexShrink: 0 }} />
-          <span>Monitors</span>
+          <span className="side__item__label">Monitors</span>
           <span className="side__item__count">{userMonitors.length}</span>
         </button>
         <button className={`side__item ${view === 'incidents' ? 'is-active' : ''}`}
           onClick={() => { setView('incidents'); setMobileMenuOpen(false); }}>
           <IncidentIcon size={12} style={{ flexShrink: 0 }} />
-          <span>Incidents</span>
+          <span className="side__item__label">Incidents</span>
           {alerts.filter(a => !a.resolvedAt).length > 0 && (
             <span className="side__item__count" style={{ color: 'var(--wt-down-500)' }}>
               {alerts.filter(a => !a.resolvedAt).length}
@@ -470,7 +506,7 @@ export default function App() {
         <button className={`side__item ${view === 'maintenance' ? 'is-active' : ''}`}
           onClick={() => { setView('maintenance'); setMobileMenuOpen(false); }}>
           <Wrench size={12} style={{ flexShrink: 0 }} />
-          <span>Maintenance</span>
+          <span className="side__item__label">Maintenance</span>
           {maintenanceMonitorIds.size > 0 && (
             <span className="side__item__count" style={{ color: 'var(--wt-viz-5)' }}>
               {maintenanceMonitorIds.size}
@@ -478,7 +514,8 @@ export default function App() {
           )}
         </button>
 
-        {/* TAGS */}
+        {/* Secondary sections — hidden in collapsed mode (below main nav, won't affect Status/Views Y positions) */}
+        <div className="sidebar-secondary">
         {allTags.length > 0 && (
           <>
             <div className="side__group flex items-center justify-between">
@@ -490,7 +527,7 @@ export default function App() {
             {allTags.map(tag => (
               <button key={tag} className={`side__item ${tagFilter.includes(tag) ? 'is-active' : ''}`} onClick={() => toggleTag(tag)}>
                 <TagIcon size={12} />
-                <span className="truncate">{tag}</span>
+                <span className="side__item__label truncate">{tag}</span>
                 <span className="side__item__count">{userMonitors.filter(m => m.tags?.includes(tag)).length}</span>
               </button>
             ))}
@@ -506,6 +543,28 @@ export default function App() {
         {/* HISTORY */}
         <div className="side__group">History</div>
         <HistoryRangeControl historyRange={historyRange} onChange={setHistoryRange} t={t} isDark={isDark} />
+        </div>{/* end sidebar-secondary */}
+
+        </div>{/* end scrollable content */}
+
+        {/* ── Collapse toggle — pinned to bottom, hidden on mobile ── */}
+        <div className="sidebar-collapse-btn pt-3 pb-1 border-t" style={{ borderColor: 'var(--wt-border)' }}>
+          <button
+            onClick={() => {
+              const next = !sidebarCollapsed;
+              setSidebarCollapsed(next);
+              setSidebarHovered(false);
+              try { localStorage.setItem('nw-sidebar-collapsed', String(next)); } catch {}
+            }}
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors opacity-40 hover:opacity-100"
+            style={{ color: 'var(--wt-text-muted)' }}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+            {sidebarCollapsed
+              ? <PanelLeftOpen  size={14} />
+              : <PanelLeftClose size={14} />}
+            {!sidebarCollapsed && <span className="wt-mono text-xs">Collapse</span>}
+          </button>
+        </div>
       </aside>
 
       {/* ── Main ── */}
@@ -548,7 +607,7 @@ export default function App() {
                 {userMonitors.length > 0 && (
                   <div className="flex items-center gap-0.5">
                     <button
-                      onClick={() => setGroupByEnabled(p => !p)}
+                      onClick={() => setGroupByEnabled(p => { const n = !p; try { localStorage.setItem('nw-group-by', String(n)); } catch {} return n; })}
                       className="wt-btn wt-btn--ghost wt-btn--sm"
                       title="Group by"
                       style={groupByEnabled ? { color: 'var(--wt-brand-500)', background: 'color-mix(in oklch, var(--wt-brand-500) 10%, transparent)' } : undefined}>
@@ -596,6 +655,7 @@ export default function App() {
                 onIncidentClick={handleIncidentClick}
                 getWidth={getWidth}
                 chartYMax={chartYMax}
+                onMoveGroup={handleMoveGroup}
               />
             ) : (
               <DndContext
@@ -807,9 +867,22 @@ function MonitorListView({ monitors, onCardClick, onEdit, t }) {
 
 // ── Grouped monitor view ──────────────────────────────────────────────────────
 
-function GroupedMonitorView({ monitors, groups, maintenanceMonitorIds, onEdit, onCardClick, onIncidentClick, getWidth, chartYMax }) {
-  // Build group buckets
-  const grouped = groups.map(g => ({
+function GroupedMonitorView({ monitors, groups, maintenanceMonitorIds, onEdit, onCardClick, onIncidentClick, getWidth, chartYMax, onMoveGroup }) {
+  const [collapsedGroups, setCollapsedGroups] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('nw-collapsed-groups') || '[]'); } catch { return []; }
+  });
+
+  const toggleCollapse = (id) => {
+    setCollapsedGroups(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+      try { localStorage.setItem('nw-collapsed-groups', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
+  // Sort by displayOrder so optimistic reorder updates are reflected immediately
+  const sorted = [...groups].sort((a, b) => a.displayOrder - b.displayOrder);
+  const grouped = sorted.map(g => ({
     ...g,
     monitors: monitors.filter(m => g.monitorIds?.includes(m.id)),
   })).filter(g => g.monitors.length > 0);
@@ -836,16 +909,47 @@ function GroupedMonitorView({ monitors, groups, maintenanceMonitorIds, onEdit, o
 
   return (
     <div>
-      {grouped.map(g => (
-        <div key={g.id}>
-          <div className="flex items-center gap-2 mb-3 mt-2">
-            <span className="wt-eyebrow">{g.name}</span>
-            <span className="wt-mono text-[11px]" style={{ color: 'var(--wt-text-faint)' }}>{g.monitors.length}</span>
-            <div className="flex-1 h-px" style={{ backgroundColor: 'var(--wt-border)' }} />
+      {grouped.map((g, idx) => {
+        const isCollapsed = collapsedGroups.includes(g.id);
+        return (
+          <div key={g.id}>
+            <div className="flex items-center gap-2 mb-3 mt-2">
+              <button
+                onClick={() => toggleCollapse(g.id)}
+                className="flex items-center gap-1.5 hover:opacity-70 transition-opacity"
+                title={isCollapsed ? 'Expand group' : 'Collapse group'}>
+                {isCollapsed
+                  ? <ChevronRight size={11} style={{ color: 'var(--wt-text-faint)', flexShrink: 0 }} />
+                  : <ChevronDown  size={11} style={{ color: 'var(--wt-text-faint)', flexShrink: 0 }} />}
+                <span className="wt-eyebrow">{g.name}</span>
+              </button>
+              <span className="wt-mono text-[11px]" style={{ color: 'var(--wt-text-faint)' }}>{g.monitors.length}</span>
+              <div className="flex-1 h-px" style={{ backgroundColor: 'var(--wt-border)' }} />
+              {onMoveGroup && (
+                <div className="flex items-center gap-0.5">
+                  <button
+                    onClick={() => onMoveGroup(g.id, 'up')}
+                    disabled={idx === 0}
+                    className="p-0.5 rounded transition-opacity opacity-30 hover:opacity-80 disabled:opacity-10"
+                    style={{ color: 'var(--wt-text-muted)' }}
+                    title="Move group up">
+                    <ArrowUp size={11} />
+                  </button>
+                  <button
+                    onClick={() => onMoveGroup(g.id, 'down')}
+                    disabled={idx === grouped.length - 1}
+                    className="p-0.5 rounded transition-opacity opacity-30 hover:opacity-80 disabled:opacity-10"
+                    style={{ color: 'var(--wt-text-muted)' }}
+                    title="Move group down">
+                    <ArrowDown size={11} />
+                  </button>
+                </div>
+              )}
+            </div>
+            {!isCollapsed && renderGrid(g.monitors)}
           </div>
-          {renderGrid(g.monitors)}
-        </div>
-      ))}
+        );
+      })}
       {ungrouped.length > 0 && (
         <div>
           {grouped.length > 0 && (

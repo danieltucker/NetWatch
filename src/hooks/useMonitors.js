@@ -23,9 +23,10 @@ function buildParams(range, window) {
 }
 
 export function useMonitors(historyWindow = '1h', historyRange = null) {
-  const [monitors, setMonitors] = useState([]);
-  const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState(null);
+  const [monitors,      setMonitors]      = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [error,         setError]         = useState(null);
+  const [sseConnected,  setSseConnected]  = useState(null); // null=unknown, true=live, false=offline
 
   // ── Fetch / re-fetch when window or custom range changes ───────────────────
   useEffect(() => {
@@ -110,9 +111,28 @@ export function useMonitors(historyWindow = '1h', historyRange = null) {
       setMonitors(prev => prev.filter(m => m.id !== id));
     });
 
-    es.onerror = () => { /* EventSource auto-reconnects */ };
+    es.onopen  = () => {
+      setSseConnected(true);
+    };
 
-    return () => es.close();
+    // onerror fires on every retry attempt; only flag offline after a sustained gap
+    let offlineTimer = null;
+    es.onerror = () => {
+      clearTimeout(offlineTimer);
+      offlineTimer = setTimeout(() => setSseConnected(false), 4000);
+    };
+
+    // Receiving any event means the connection is alive
+    const markAlive = () => {
+      clearTimeout(offlineTimer);
+      setSseConnected(true);
+    };
+    es.addEventListener('monitor:checked', markAlive);
+
+    return () => {
+      clearTimeout(offlineTimer);
+      es.close();
+    };
   }, []);
 
   // ── CRUD ────────────────────────────────────────────────────────────────────
@@ -159,5 +179,5 @@ export function useMonitors(historyWindow = '1h', historyRange = null) {
       .catch(err  => { setError(err.message); setLoading(false); throw err; });
   }, [historyWindow, historyRange]);
 
-  return { monitors, loading, error, addMonitor, updateMonitor, deleteMonitor, refresh };
+  return { monitors, loading, error, sseConnected, addMonitor, updateMonitor, deleteMonitor, refresh };
 }

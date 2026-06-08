@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronLeft, Send, CheckCircle, AlertCircle, Loader, Bell, Settings2, SlidersHorizontal, Puzzle, ExternalLink, FileBarChart2, Plus, Wifi, Globe, Terminal, Key, Copy, RefreshCw, Trash2, Layers, Edit2 } from 'lucide-react';
+import { X, ChevronLeft, Send, CheckCircle, AlertCircle, Loader, Bell, Settings2, SlidersHorizontal, Puzzle, ExternalLink, FileBarChart2, Plus, Wifi, Globe, Terminal, Key, Copy, RefreshCw, Trash2, Layers, Edit2, Check } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { moduleRegistry } from '../modules/index.js';
 import { NETWORK_REF_PRESETS, DEFAULT_NETWORK_REFS_ENABLED } from '../types/networkRefs.js';
@@ -339,7 +339,7 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
           {/* Version label — desktop only */}
           <div className="hidden sm:block px-5 py-5">
             <div className="text-xs wt-mono" style={{ color: t.textFaint }}>
-              NetWatch v6.8.1
+              NetWatch v6.9.0
             </div>
           </div>
         </aside>

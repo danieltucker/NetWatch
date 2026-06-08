@@ -171,13 +171,74 @@ export function MaintenancePage({ monitors }) {
     load();
   };
 
-  const filtered = events.filter(e => {
-    const s = eventStatus(e);
-    if (filter === 'all') return true;
-    return s === filter;
+  // Sort: active first (soonest start), upcoming next (soonest start), past last (most recent end)
+  const STATUS_ORDER = { active: 0, upcoming: 1, past: 2 };
+  const sorted = [...events].sort((a, b) => {
+    const sa = eventStatus(a), sb = eventStatus(b);
+    if (STATUS_ORDER[sa] !== STATUS_ORDER[sb]) return STATUS_ORDER[sa] - STATUS_ORDER[sb];
+    if (sa === 'past') return new Date(b.endAt) - new Date(a.endAt);
+    return new Date(a.startAt) - new Date(b.startAt);
   });
 
+  const filtered = sorted.filter(e => {
+    if (filter === 'all') return true;
+    return eventStatus(e) === filter;
+  });
+
+  // Split for "All" view past divider
+  const currentEvents = filter === 'all' ? filtered.filter(e => eventStatus(e) !== 'past') : filtered;
+  const pastEvents    = filter === 'all' ? filtered.filter(e => eventStatus(e) === 'past')  : [];
+
   const userMonitors = monitors.filter(m => !m.tags?.includes('_ref'));
+
+  const renderEventList = (list, isPast) => list.map(event => {
+    const status           = isPast ? 'past' : eventStatus(event);
+    const affectedMonitors = userMonitors.filter(m => event.monitorIds?.includes(m.id));
+    return (
+      <div key={event.id} className="wt-card p-4 space-y-3"
+        style={{
+          ...(status === 'active' ? { borderLeftWidth: 3, borderLeftColor: MAINTENANCE_COLOR } : {}),
+          ...(isPast ? { opacity: 0.7 } : {}),
+        }}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0 space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium text-sm" style={{ color: t.textPrimary }}>{event.name}</span>
+              <StatusBadge status={status} />
+            </div>
+            <div className="wt-mono text-xs flex flex-wrap gap-x-4 gap-y-0.5" style={{ color: t.textMuted }}>
+              <span>{formatDt(event.startAt)}</span>
+              <span style={{ color: t.textFaint }}>→</span>
+              <span>{formatDt(event.endAt)}</span>
+            </div>
+            {event.note && (
+              <p className="text-xs leading-relaxed" style={{ color: t.textMuted }}>{event.note}</p>
+            )}
+          </div>
+          {!isPast && (
+            <div className="flex items-center gap-1 shrink-0">
+              <button onClick={() => { setEditEvent(event); setShowForm(false); }}
+                className="wt-btn wt-btn--ghost wt-btn--sm" title="Edit">
+                <Edit2 size={13} />
+              </button>
+              <button onClick={() => remove(event.id)}
+                className="wt-btn wt-btn--ghost wt-btn--sm" title="Delete"
+                style={{ color: 'var(--wt-down-500)' }}>
+                <Trash2 size={13} />
+              </button>
+            </div>
+          )}
+        </div>
+        {affectedMonitors.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {affectedMonitors.map(m => (
+              <span key={m.id} className="wt-chip wt-chip--plain" style={{ fontSize: 11 }}>{m.label}</span>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  });
 
   return (
     <div>
@@ -236,51 +297,19 @@ export function MaintenancePage({ monitors }) {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map(event => {
-            const status      = eventStatus(event);
-            const affectedMonitors = userMonitors.filter(m => event.monitorIds?.includes(m.id));
-            return (
-              <div key={event.id} className="wt-card p-4 space-y-3"
-                style={status === 'active' ? { borderLeftWidth: 3, borderLeftColor: MAINTENANCE_COLOR } : undefined}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm" style={{ color: t.textPrimary }}>{event.name}</span>
-                      <StatusBadge status={status} />
-                    </div>
-                    <div className="wt-mono text-xs flex flex-wrap gap-x-4 gap-y-0.5" style={{ color: t.textMuted }}>
-                      <span>{formatDt(event.startAt)}</span>
-                      <span style={{ color: t.textFaint }}>→</span>
-                      <span>{formatDt(event.endAt)}</span>
-                    </div>
-                    {event.note && (
-                      <p className="text-xs leading-relaxed" style={{ color: t.textMuted }}>{event.note}</p>
-                    )}
-                  </div>
-                  {status !== 'past' && (
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => { setEditEvent(event); setShowForm(false); }}
-                        className="wt-btn wt-btn--ghost wt-btn--sm" title="Edit">
-                        <Edit2 size={13} />
-                      </button>
-                      <button onClick={() => remove(event.id)}
-                        className="wt-btn wt-btn--ghost wt-btn--sm" title="Delete"
-                        style={{ color: 'var(--wt-down-500)' }}>
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {affectedMonitors.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {affectedMonitors.map(m => (
-                      <span key={m.id} className="wt-chip wt-chip--plain" style={{ fontSize: 11 }}>{m.label}</span>
-                    ))}
-                  </div>
-                )}
+          {renderEventList(currentEvents, false)}
+
+          {/* Past divider — only in All view when there are past events */}
+          {pastEvents.length > 0 && (
+            <>
+              <div className="flex items-center gap-3 py-2">
+                <div className="flex-1 h-px" style={{ backgroundColor: t.cardBorder }} />
+                <span className="wt-eyebrow" style={{ color: t.textFaint }}>Past</span>
+                <div className="flex-1 h-px" style={{ backgroundColor: t.cardBorder }} />
               </div>
-            );
-          })}
+              {renderEventList(pastEvents, true)}
+            </>
+          )}
         </div>
       )}
     </div>

@@ -3,8 +3,19 @@
 @tailwind utilities;
 
 /* ── NetWatch signature hue (azure → violet) ─────────────────────────────── */
-:root { --nw-from: var(--wt-brand-500); --nw-to: oklch(0.480 0.150 290); --nw-ink: oklch(0.480 0.150 290); }
-[data-theme="dark"] { --nw-ink: oklch(0.760 0.130 292); }
+:root {
+  --nw-from: var(--wt-brand-500);
+  --nw-to: oklch(0.480 0.150 290);
+  --nw-ink: oklch(0.480 0.150 290);
+  /* Sidebar hover-overlay bg: explicit rgba so alpha is guaranteed (color-mix
+     with 'transparent' mixes toward black, not toward white-with-alpha) */
+  --nw-sidebar-overlay: rgba(255, 255, 255, 0.85);
+}
+[data-theme="dark"] {
+  --nw-ink: oklch(0.760 0.130 292);
+  /* dark surface ≈ oklch(0.213 0.015 262) → ~rgb(35,38,55) */
+  --nw-sidebar-overlay: rgba(35, 38, 55, 0.88);
+}
 
 /* ── Base ─────────────────────────────────────────────────────────────────── */
 body {
@@ -24,20 +35,114 @@ body {
 /* ── App shell grid (family chrome) ────────────────────────────────────────── */
 .app  { display: grid; grid-template-columns: 260px 1fr; grid-template-rows: 56px 1fr; height: 100vh; overflow: hidden; }
 .app__top  { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; padding: 0 16px; background: var(--wt-surface); border-bottom: 1px solid var(--wt-border); }
-.app__side { background: var(--wt-surface); border-right: 1px solid var(--wt-border); padding: 14px 12px; overflow-y: auto; }
-.app__main { overflow-y: auto; padding: 0 var(--wt-6) var(--wt-6); }
+/* Explicit grid placement — when .app__side becomes position:absolute (.is-expanded),
+   CSS Grid drops it from auto-placement, causing .app__main to land in col 1 (52px).
+   Pinning both to their columns prevents this regardless of sidebar flow state. */
+.app__side { grid-column: 1; grid-row: 2; background: var(--wt-surface); border-right: 1px solid var(--wt-border); padding: 14px 12px; display: flex; flex-direction: column; overflow: hidden; }
+.app__main { grid-column: 2; grid-row: 2; overflow-y: auto; padding: var(--wt-6) var(--wt-6) var(--wt-6); }
 
 .side__group { font-family: var(--wt-font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.11em; text-transform: uppercase; color: var(--wt-text-subtle); padding: 0 8px; margin: 14px 0 6px; }
 .side__group:first-child { margin-top: 0; }
-.side__item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border-radius: var(--wt-r-md); border: 0; background: transparent; cursor: pointer; color: var(--wt-text-muted); font-family: var(--wt-font-sans); font-size: var(--wt-text-sm); text-align: left; border-left: 2px solid transparent; transition: background var(--wt-dur) var(--wt-ease), color var(--wt-dur) var(--wt-ease); }
+.side__item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border-radius: var(--wt-r-md); border: 0; background: transparent; cursor: pointer; color: var(--wt-text-muted); font-family: var(--wt-font-sans); font-size: var(--wt-text-sm); text-align: left; transition: background var(--wt-dur) var(--wt-ease), color var(--wt-dur) var(--wt-ease); }
 .side__item:hover { background: var(--wt-surface-2); color: var(--wt-text); }
-.side__item.is-active { background: color-mix(in oklch, var(--wt-brand-500) 10%, transparent); color: var(--wt-brand-500); border-left-color: var(--wt-brand-400); }
+.side__item.is-active { background: color-mix(in oklch, var(--wt-brand-500) 16%, transparent); color: var(--wt-brand-500); box-shadow: inset 4px 0 0 var(--wt-brand-500); font-weight: 600; }
+.side__item__label { flex: 1; min-width: 0; }
 .side__item__count { margin-left: auto; font-family: var(--wt-font-mono); font-size: 11px; color: var(--wt-text-subtle); font-variant-numeric: tabular-nums; }
+
+/* ── Collapsed sidebar — single rendering path, CSS-driven icon-only mode ───── */
+/* Group headers stay in the DOM (opacity:0) to preserve their layout height.
+   Items get min-height:32px so their height matches expanded items exactly —
+   this guarantees identical Y positions between collapsed and expanded states. */
+.app.sidebar-collapsed .app__side:not(.is-expanded):not(.is-open) .side__group {
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+}
+.app.sidebar-collapsed .app__side:not(.is-expanded):not(.is-open) .side__item {
+  justify-content: center;
+  gap: 3px;
+  padding-left: 4px;
+  padding-right: 4px;
+  min-height: 32px; /* match expanded item height so Y positions are identical */
+}
+/* Hide label but keep height contribution for Y-position stability */
+.app.sidebar-collapsed .app__side:not(.is-expanded):not(.is-open) .side__item__label {
+  display: none;
+}
+/* Show count inline (small), remove auto-margin so it sits next to icon */
+.app.sidebar-collapsed .app__side:not(.is-expanded):not(.is-open) .side__item__count {
+  margin-left: 0;
+  font-size: 10px;
+}
+/* Upsize icons to match old compact strip feel */
+.app.sidebar-collapsed .app__side:not(.is-expanded):not(.is-open) .side__item svg {
+  width: 15px;
+  height: 15px;
+}
+/* Active state in collapsed mode: color only, no background or left bar */
+.app.sidebar-collapsed .app__side:not(.is-expanded):not(.is-open) .side__item.is-active {
+  background: transparent;
+  box-shadow: none;
+}
+/* "All" status item has no icon — invisible spacer to preserve position of items below */
+.app.sidebar-collapsed .app__side:not(.is-expanded):not(.is-open) .side__item--no-icon {
+  opacity: 0;
+  pointer-events: none;
+}
+/* Tags / Sort / History — hidden in collapsed mode; below main nav so doesn't affect Status/Views Y positions */
+.app.sidebar-collapsed .app__side:not(.is-expanded):not(.is-open) .sidebar-secondary {
+  display: none;
+}
 
 .section-head { position: sticky; top: 0; z-index: 5; padding: var(--wt-6) 0 10px; margin-bottom: 4px; background: var(--wt-bg); }
 
+/* ── Collapsible sidebar ─────────────────────────────────────────────────────── */
+.app.sidebar-collapsed { grid-template-columns: 52px 1fr; }
+
+.app.sidebar-collapsed .app__side {
+  width: 52px;
+  overflow: hidden;
+  transition: width 0.18s var(--wt-ease), box-shadow 0.18s var(--wt-ease);
+}
+
+/* Overlay expansion on hover — uses explicit rgba so alpha is real, not mixed toward black */
+.app.sidebar-collapsed .app__side.is-expanded {
+  position: absolute;
+  top: 56px;
+  left: 0;
+  width: 260px;
+  height: calc(100vh - 56px);
+  z-index: 40;
+  background: var(--nw-sidebar-overlay);
+  box-shadow: 4px 0 24px rgba(0,0,0,0.10);
+}
+
+/* Compact icon items shown only when collapsed */
+.side__item--compact { justify-content: center; gap: 0; padding: 7px 0; }
+.side__item--compact span.label { display: none; }
+
+/* Match specificity of sidebar-collapsed rules so mobile overrides win */
 @media (max-width: 1180px) {
-  .app { grid-template-columns: 1fr; grid-template-rows: 56px 1fr; }
-  .app__side { display: none; }
-  .app__side.is-open { display: block; position: fixed; top: 56px; left: 0; bottom: 0; width: 260px; z-index: 50; box-shadow: var(--wt-shadow-lg); }
+  .app,
+  .app.sidebar-collapsed { grid-template-columns: 1fr; grid-template-rows: 56px 1fr; }
+
+  .app__main,
+  .app.sidebar-collapsed .app__main { grid-column: 1; grid-row: 2; }
+
+  .app__side,
+  .app.sidebar-collapsed .app__side { display: none; width: auto; overflow: visible; }
+
+  .app__side.is-open,
+  .app.sidebar-collapsed .app__side.is-open {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 56px; left: 0; bottom: 0;
+    width: 260px;
+    z-index: 50;
+    box-shadow: var(--wt-shadow-lg);
+  }
+
+  /* Hide the collapse toggle on mobile — not useful when sidebar is a drawer */
+  .sidebar-collapse-btn { display: none; }
 }
