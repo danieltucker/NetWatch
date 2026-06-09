@@ -8,7 +8,7 @@ import { broadcast }                    from '../sse.js';
 const router = Router();
 
 const ALLOWED_CHECK_TYPES = new Set(['http', 'tcp', 'icmp', 'api']);
-const MIN_INTERVAL_S = 30;
+const MIN_INTERVAL_S = 15;
 
 // ── Window config ─────────────────────────────────────────────────────────────
 // ms: lookback span in milliseconds — used to compute an ISO cutoff in JS.
@@ -255,7 +255,7 @@ router.post('/', (req, res) => {
     createdAt:         new Date().toISOString(),
   });
 
-  scheduleMonitor(id, interval);
+  scheduleMonitor(id);
 
   const payload = buildMonitorPayload(id);
   broadcast('monitor:created', payload);
@@ -330,7 +330,7 @@ router.put('/:id', (req, res) => {
     WHERE id = @id
   `).run({ ...next, id });
 
-  scheduleMonitor(id, next.interval);
+  scheduleMonitor(id);
 
   const payload = buildMonitorPayload(id);
   broadcast('monitor:updated', payload);

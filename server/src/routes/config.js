@@ -80,7 +80,7 @@ router.get('/export', (_req, res) => {
   res.json({
     version:          '1',
     exportedAt:       new Date().toISOString(),
-    netwatchVersion:  '6.13.1',
+    netwatchVersion:  '6.14.0',
     monitors,
     groups:           groupsWithMembers,
     maintenance,

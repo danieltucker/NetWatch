@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Download, FileText, Loader, BarChart2, AlertTriangle, AlertCircle, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Download, FileText, Loader, BarChart2, AlertTriangle, Clock, ChevronRight } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 
 const RANGES = [
@@ -22,6 +22,11 @@ function formatDateLocal(iso) {
   catch { return iso; }
 }
 
+function formatDateShort(iso) {
+  try { return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); }
+  catch { return iso; }
+}
+
 function uptimePill(pct) {
   if (pct === null) return <span className="wt-mono text-xs" style={{ color: 'var(--wt-text-faint)' }}>—</span>;
   const color = pct >= 99 ? 'var(--wt-up-600)' : pct >= 95 ? 'var(--wt-warn-600)' : 'var(--wt-down-600)';
@@ -31,25 +36,16 @@ function uptimePill(pct) {
 function exportCsv(report) {
   const header = ['Monitor', 'Target', 'Type', 'Uptime %', 'Total Checks', 'Up', 'Degraded', 'Down', 'Avg Ping (ms)', 'Outages', 'Degraded Events', 'Total Downtime'];
   const rows = report.monitors.map(m => [
-    m.label,
-    m.target,
-    m.checkType,
-    m.uptimePct ?? '',
-    m.totalChecks,
-    m.upChecks,
-    m.degradedChecks,
-    m.downChecks,
-    m.avgPingMs ?? '',
-    m.outageCount,
-    m.degradedCount,
+    m.label, m.target, m.checkType,
+    m.uptimePct ?? '', m.totalChecks, m.upChecks, m.degradedChecks, m.downChecks,
+    m.avgPingMs ?? '', m.outageCount, m.degradedCount,
     m.totalDowntimeMs ? Math.round(m.totalDowntimeMs / 60000) + 'm' : '0m',
   ]);
   const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  const date = new Date().toISOString().slice(0, 10);
-  a.href = url; a.download = `netwatch-report-${date}.csv`; a.click();
+  a.href = url; a.download = `netwatch-report-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
   URL.revokeObjectURL(url);
 }
 
@@ -57,20 +53,36 @@ function exportJson(report) {
   const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  const date = new Date().toISOString().slice(0, 10);
-  a.href = url; a.download = `netwatch-report-${date}.json`; a.click();
+  a.href = url; a.download = `netwatch-report-${new Date().toISOString().slice(0, 10)}.json`; a.click();
   URL.revokeObjectURL(url);
 }
 
 export function ReportsPage() {
   const { t } = useTheme();
-  const [rangeIdx,    setRangeIdx]    = useState(1); // default 30d
+  const [rangeIdx,    setRangeIdx]    = useState(1);
   const [customFrom,  setCustomFrom]  = useState('');
   const [customTo,    setCustomTo]    = useState('');
   const [useCustom,   setUseCustom]   = useState(false);
   const [report,      setReport]      = useState(null);
   const [loading,     setLoading]     = useState(false);
   const [error,       setError]       = useState('');
+  const [history,     setHistory]     = useState([]);
+  const [histLoading, setHistLoading] = useState(false);
+
+  const loadHistory = async () => {
+    setHistLoading(true);
+    try {
+      const res  = await fetch('/api/reports/history');
+      const data = await res.json();
+      setHistory(Array.isArray(data) ? data : []);
+    } catch {
+      setHistory([]);
+    } finally {
+      setHistLoading(false);
+    }
+  };
+
+  useEffect(() => { loadHistory(); }, []);
 
   const generate = async () => {
     setLoading(true); setError(''); setReport(null);
@@ -88,6 +100,7 @@ export function ReportsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to generate report');
       setReport(data);
+      loadHistory();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -95,23 +108,34 @@ export function ReportsPage() {
     }
   };
 
-  // Summary stats derived from report
+  const loadHistoryItem = async (id) => {
+    setLoading(true); setError(''); setReport(null);
+    try {
+      const res  = await fetch(`/api/reports/${id}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load report');
+      setReport(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const summary = report ? (() => {
     const mons  = report.monitors.filter(m => m.totalChecks > 0);
     const avgUp = mons.length
       ? Math.round(mons.reduce((s, m) => s + (m.uptimePct ?? 0), 0) / mons.length * 100) / 100
       : null;
     const totalOutages  = report.monitors.reduce((s, m) => s + m.outageCount, 0);
-    const totalDegraded = report.monitors.reduce((s, m) => s + m.degradedCount, 0);
     const affected      = report.monitors.filter(m => m.outageCount > 0 || m.degradedCount > 0).length;
-    return { avgUp, totalOutages, totalDegraded, affected, monitorCount: mons.length };
+    return { avgUp, totalOutages, affected, monitorCount: mons.length };
   })() : null;
 
   return (
     <div>
       {/* Controls */}
       <div className="wt-card mb-5 p-5 space-y-4">
-        {/* Range selector */}
         <div>
           <div className="wt-eyebrow mb-2">Time range</div>
           <div className="flex flex-wrap gap-2 items-center">
@@ -197,13 +221,13 @@ export function ReportsPage() {
 
       {/* Results table */}
       {report && report.monitors.length === 0 && (
-        <div className="wt-card py-16 text-center text-sm wt-mono" style={{ color: t.textFaint }}>
+        <div className="wt-card py-16 text-center text-sm wt-mono mb-5" style={{ color: t.textFaint }}>
           No monitors found
         </div>
       )}
 
       {report && report.monitors.length > 0 && (
-        <div className="wt-card overflow-x-auto">
+        <div className="wt-card overflow-x-auto mb-5">
           <table className="w-full min-w-[700px]">
             <thead>
               <tr className="border-b" style={{ borderColor: 'var(--wt-border)', backgroundColor: 'var(--wt-surface-2)' }}>
@@ -217,10 +241,9 @@ export function ReportsPage() {
             </thead>
             <tbody>
               {report.monitors.map((m, i) => (
-                <tr key={m.id}
-                  className="border-b"
+                <tr key={m.id} className="border-b"
                   style={{
-                    borderColor: 'var(--wt-border)',
+                    borderColor:       'var(--wt-border)',
                     borderBottomWidth: i === report.monitors.length - 1 ? 0 : 1,
                   }}>
                   <td className="px-4 py-3">
@@ -260,13 +283,53 @@ export function ReportsPage() {
       )}
 
       {!report && !loading && (
-        <div className="wt-card py-20 flex flex-col items-center gap-3">
+        <div className="wt-card py-16 flex flex-col items-center gap-3 mb-5">
           <BarChart2 size={36} style={{ color: 'var(--wt-text-faint)', opacity: 0.4 }} />
           <p className="text-sm wt-mono" style={{ color: t.textMuted }}>
             Select a time range and click Generate report
           </p>
         </div>
       )}
+
+      {/* Past reports history */}
+      <div>
+        <div className="wt-eyebrow mb-3">Past reports <span className="normal-case font-normal" style={{ color: t.textFaint }}>(last 30 days)</span></div>
+        {histLoading ? (
+          <div className="wt-card py-8 flex items-center justify-center gap-2 text-xs wt-mono"
+            style={{ color: t.textFaint }}>
+            <Loader size={13} className="animate-spin" /> Loading…
+          </div>
+        ) : history.length === 0 ? (
+          <div className="wt-card py-8 text-center text-xs wt-mono" style={{ color: t.textFaint }}>
+            No saved reports yet — generate one above
+          </div>
+        ) : (
+          <div className="wt-card overflow-hidden">
+            {history.map((item, i) => (
+              <button
+                key={item.id}
+                onClick={() => loadHistoryItem(item.id)}
+                className="w-full flex items-center gap-4 px-4 py-3 text-left transition-colors"
+                style={{
+                  borderBottom: i < history.length - 1 ? `1px solid var(--wt-border)` : 'none',
+                }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--wt-surface-2)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = ''}>
+                <Clock size={13} style={{ color: t.textFaint, flexShrink: 0 }} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium" style={{ color: t.textPrimary }}>
+                    {formatDateShort(item.from)} — {formatDateShort(item.to)}
+                  </div>
+                  <div className="wt-mono text-xs mt-0.5" style={{ color: t.textFaint }}>
+                    Generated {formatDateLocal(item.generatedAt)}
+                  </div>
+                </div>
+                <ChevronRight size={13} style={{ color: t.textFaint, flexShrink: 0 }} />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

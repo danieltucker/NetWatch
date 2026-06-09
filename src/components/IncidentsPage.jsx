@@ -43,7 +43,7 @@ function alertsToIncidents(alerts) {
 // The `alerts` prop (live banner state) is only used for the active count badge.
 export function IncidentsPage({ alerts: liveAlerts, monitors, onOpenDetail }) {
   const { t } = useTheme();
-  const [filter,    setFilter]    = useState('all');
+  const [filter,    setFilter]    = useState('active');
   const [history,   setHistory]   = useState(null);
   const [loadError, setLoadError] = useState('');
 
@@ -91,10 +91,10 @@ export function IncidentsPage({ alerts: liveAlerts, monitors, onOpenDetail }) {
       {/* Filter toolbar */}
       <div className="flex items-center justify-between pb-4">
         <div className="wt-seg">
-          <button aria-selected={filter === 'all'}      onClick={() => setFilter('all')}>
-            All <span className="wt-mono opacity-60 ml-0.5" style={{ fontSize: 10 }}>{allIncidents.length}</span>
+          <button aria-selected={filter === 'active'}   onClick={() => setFilter('active')}>
+            Active
+            {activeCount > 0 && <span className="wt-mono opacity-60 ml-0.5" style={{ fontSize: 10 }}>{activeCount}</span>}
           </button>
-          <button aria-selected={filter === 'active'}   onClick={() => setFilter('active')}>Active</button>
           <button aria-selected={filter === 'resolved'} onClick={() => setFilter('resolved')}>Resolved</button>
         </div>
       </div>
@@ -181,8 +181,8 @@ export function IncidentsPage({ alerts: liveAlerts, monitors, onOpenDetail }) {
       {filtered.length > 0 && (
         <div className="mt-3 text-xs wt-mono" style={{ color: t.textFaint }}>
           {filtered.length} incident{filtered.length !== 1 ? 's' : ''}
-          {activeCount > 0 && filter !== 'resolved' ? ` · ${activeCount} active` : ''}
-          {resolvedCount > 0 && filter !== 'active'  ? ` · ${resolvedCount} resolved` : ''}
+          {filter === 'active'   && resolvedCount > 0 ? ` · ${resolvedCount} resolved` : ''}
+          {filter === 'resolved' && activeCount   > 0 ? ` · ${activeCount} active`     : ''}
         </div>
       )}
     </div>

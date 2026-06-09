@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS = {
   twilio_from: '', twilio_to: '',
   webhook_enabled: '', webhook_url: '',
   report_enabled: '', report_interval: 'weekly', report_time: '08:00', report_tag_filter: '',
+  down_check_interval: '30',
 };
 
 const TABS = [
@@ -341,7 +342,7 @@ export function SettingsPanel({ onClose, onImportSuccess, chartYMax = 'auto', on
           {/* Version label — desktop only */}
           <div className="hidden sm:block px-5 py-5">
             <div className="text-xs wt-mono" style={{ color: t.textFaint }}>
-              NetWatch v6.13.1
+              NetWatch v6.14.0
             </div>
           </div>
         </aside>
@@ -395,6 +396,15 @@ export function SettingsPanel({ onClose, onImportSuccess, chartYMax = 'auto', on
                 onAlertsAutoOpenChange={onAlertsAutoOpenChange}
                 themeMode={themeMode}
                 setThemeMode={setThemeMode}
+                downCheckInterval={settings.down_check_interval || '30'}
+                onDownCheckIntervalChange={v => {
+                  set('down_check_interval', v);
+                  fetch('/api/settings', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ down_check_interval: v }),
+                  }).catch(console.error);
+                }}
                 t={t}
                 isDark={isDark}
               />
@@ -511,7 +521,7 @@ const THEME_OPTIONS = [
   { value: 'dark',  label: 'Dark'  },
 ];
 
-function GeneralTab({ chartYMax, onChartYMaxChange, alertsAutoOpen, onAlertsAutoOpenChange, themeMode, setThemeMode, t, isDark }) {
+function GeneralTab({ chartYMax, onChartYMaxChange, alertsAutoOpen, onAlertsAutoOpenChange, themeMode, setThemeMode, downCheckInterval, onDownCheckIntervalChange, t, isDark }) {
   return (
     <div className="space-y-3">
       <SettingRow
@@ -573,6 +583,22 @@ function GeneralTab({ chartYMax, onChartYMaxChange, alertsAutoOpen, onAlertsAuto
           <option value="outage">On outage only</option>
           <option value="both">On any alert</option>
           <option value="never">Never</option>
+        </select>
+      </SettingRow>
+
+      <SettingRow
+        title="Down check interval"
+        description="How often to check a monitor when it is down or degraded. Uses whichever is faster — this value or the monitor's normal interval."
+        t={t}>
+        <select
+          value={downCheckInterval}
+          onChange={e => onDownCheckIntervalChange?.(e.target.value)}
+          className="text-xs wt-mono wt-input appearance-none cursor-pointer"
+          style={{ backgroundColor: t.inputBg, color: t.textSecondary, borderColor: t.cardBorder }}>
+          <option value="10">10s</option>
+          <option value="15">15s</option>
+          <option value="30">30s</option>
+          <option value="60">60s</option>
         </select>
       </SettingRow>
     </div>

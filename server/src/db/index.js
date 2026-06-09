@@ -124,6 +124,17 @@ db.exec(`
     monitor_id TEXT NOT NULL REFERENCES monitors(id)           ON DELETE CASCADE,
     PRIMARY KEY (event_id, monitor_id)
   );
+
+  CREATE TABLE IF NOT EXISTS saved_reports (
+    id           TEXT PRIMARY KEY,
+    range_from   TEXT NOT NULL,
+    range_to     TEXT NOT NULL,
+    generated_at TEXT NOT NULL,
+    data         TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_saved_reports_generated
+    ON saved_reports (generated_at DESC);
 `);
 
 // ── Migrations for existing databases ─────────────────────────────────────────

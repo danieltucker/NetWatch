@@ -26,6 +26,7 @@
  */
 
 export const INTERVAL_OPTIONS = [
+  { label: '15s',  value: 15 },
   { label: '30s',  value: 30 },
   { label: '1m',   value: 60 },
   { label: '5m',   value: 300 },

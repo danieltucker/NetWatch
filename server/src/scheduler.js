@@ -14,14 +14,29 @@
  */
 
 import { randomUUID }       from 'node:crypto';
-import { db, rowToMonitor, rowToAlert } from './db/index.js';
+import { db, rowToMonitor, rowToAlert, getSetting } from './db/index.js';
 import { runCheck }         from './checkers/index.js';
 import { broadcast }        from './sse.js';
 import { dispatchAlerts }   from './alerter.js';
 
-const timers = new Map(); // monitorId → NodeJS.Timer
+const timers = new Map(); // monitorId → timeout handle | null
 
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
+
+// Returns the interval to use for the next check.
+// When a monitor has an active alert, uses min(normalInterval, downCheckInterval)
+// so faster normal checks are never slowed down.
+function computeEffectiveInterval(monitor) {
+  const activeAlert = db.prepare(
+    'SELECT 1 FROM alerts WHERE monitor_id = ? AND resolved_at IS NULL LIMIT 1'
+  ).get(monitor.id);
+
+  if (!activeAlert) return monitor.interval;
+
+  const raw = parseInt(getSetting('down_check_interval', '30'), 10);
+  const downInterval = Number.isFinite(raw) && raw >= 5 ? raw : 30;
+  return Math.min(monitor.interval, downInterval);
+}
 
 // ── Alert config helpers ──────────────────────────────────────────────────────
 
@@ -243,22 +258,25 @@ export async function executeCheck(monitor) {
 
 // ── Scheduling ────────────────────────────────────────────────────────────────
 
-export function scheduleMonitor(id, intervalSeconds) {
+export function scheduleMonitor(id) {
   stopMonitor(id);
+  timers.set(id, null); // mark as active before first async check
 
-  const tick = async () => {
+  async function tick() {
     const row = db.prepare('SELECT * FROM monitors WHERE id = ?').get(id);
-    if (!row) { stopMonitor(id); return; }
-    await executeCheck(rowToMonitor(row));
-  };
+    if (!row) { timers.delete(id); return; }
+    const monitor = rowToMonitor(row);
+    await executeCheck(monitor);
+    if (!timers.has(id)) return; // was stopped during the check
+    timers.set(id, setTimeout(tick, computeEffectiveInterval(monitor) * 1000));
+  }
 
-  tick();
-  timers.set(id, setInterval(tick, intervalSeconds * 1000));
+  tick().catch(console.error);
 }
 
 export function stopMonitor(id) {
-  const timer = timers.get(id);
-  if (timer) { clearInterval(timer); timers.delete(id); }
+  clearTimeout(timers.get(id)); // safe to call with null/undefined
+  timers.delete(id);
 }
 
 // ── Recurring maintenance ─────────────────────────────────────────────────────
@@ -316,7 +334,7 @@ function spawnRecurringOccurrences() {
 export function initScheduler() {
   const monitors = db.prepare('SELECT * FROM monitors').all().map(rowToMonitor);
   for (const m of monitors) {
-    scheduleMonitor(m.id, m.interval);
+    scheduleMonitor(m.id);
   }
   console.log(`[netwatch:scheduler] ${monitors.length} monitor(s) scheduled`);
 
