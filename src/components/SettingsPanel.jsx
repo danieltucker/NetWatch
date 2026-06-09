@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronLeft, Send, CheckCircle, AlertCircle, Loader, Bell, Settings2, SlidersHorizontal, Puzzle, ExternalLink, FileBarChart2, Plus, Wifi, Globe, Terminal, Key, Copy, RefreshCw, Trash2, Layers, Edit2, Check } from 'lucide-react';
+import { X, ChevronLeft, Send, CheckCircle, AlertCircle, Loader, Bell, Settings2, SlidersHorizontal, Puzzle, ExternalLink, FileBarChart2, Plus, Wifi, Globe, Terminal, Key, Copy, RefreshCw, Trash2, Layers, Edit2, Check, Download, Upload, Database } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { moduleRegistry } from '../modules/index.js';
 import { NETWORK_REF_PRESETS, DEFAULT_NETWORK_REFS_ENABLED } from '../types/networkRefs.js';
@@ -24,6 +24,7 @@ const TABS = [
   { id: 'groups',        label: 'Groups',         Icon: Layers         },
   { id: 'modules',       label: 'Modules',        Icon: Puzzle         },
   { id: 'api-keys',      label: 'API Keys',       Icon: Key            },
+  { id: 'backup',        label: 'Backup',         Icon: Database       },
 ];
 
 // Required fields per channel — used for pre-save validation.
@@ -256,6 +257,7 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
     activeTab === 'network'       ? 'Configure network reference monitors'      :
     activeTab === 'groups'        ? 'Organise monitors into named groups'       :
     activeTab === 'api-keys'      ? 'Manage API keys for external integrations' :
+    activeTab === 'backup'        ? 'Export and import your full configuration'  :
                                     'Install modules and manage credentials';
 
   return (
@@ -339,7 +341,7 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
           {/* Version label — desktop only */}
           <div className="hidden sm:block px-5 py-5">
             <div className="text-xs wt-mono" style={{ color: t.textFaint }}>
-              NetWatch v6.9.0
+              NetWatch v6.11.0
             </div>
           </div>
         </aside>
@@ -431,6 +433,9 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
             )}
             {activeTab === 'api-keys' && (
               <ApiKeysTab t={t} />
+            )}
+            {activeTab === 'backup' && (
+              <BackupTab t={t} />
             )}
             {activeTab === 'notifications' && (
               <NotificationsTab
@@ -1588,20 +1593,47 @@ function NetworkTab({ networkRefsEnabled, setNetworkRefsEnabled, networkRefsCust
 // ── API Keys tab ──────────────────────────────────────────────────────────────
 
 function ApiKeysTab({ t }) {
-  const [keys,        setKeys]        = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [newName,     setNewName]     = useState('');
-  const [creating,    setCreating]    = useState(false);
-  const [revealedKey, setRevealedKey] = useState(null); // { id, key, name }
-  const [copied,      setCopied]      = useState(false);
-  const [error,       setError]       = useState('');
+  const [keys,           setKeys]           = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [requiresSecret, setRequiresSecret] = useState(false);
+  const [adminSecret,    setAdminSecret]    = useState(() => {
+    try { return sessionStorage.getItem('nw-admin-secret') ?? ''; } catch { return ''; }
+  });
+  const [secretInput,    setSecretInput]    = useState('');
+  const [secretError,    setSecretError]    = useState('');
+  const [newName,        setNewName]        = useState('');
+  const [creating,       setCreating]       = useState(false);
+  const [revealedKey,    setRevealedKey]    = useState(null);
+  const [copied,         setCopied]         = useState(false);
+  const [error,          setError]          = useState('');
 
-  useEffect(() => {
-    fetch('/api/keys')
-      .then(r => r.json())
-      .then(data => { setKeys(Array.isArray(data) ? data : []); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, []);
+  const authHeaders = () => adminSecret ? { 'x-admin-secret': adminSecret } : {};
+
+  const loadKeys = async (secret = adminSecret) => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/keys', { headers: secret ? { 'x-admin-secret': secret } : {} });
+      if (res.status === 401) { setRequiresSecret(true); setLoading(false); return; }
+      const data = await res.json();
+      setKeys(Array.isArray(data) ? data : []);
+      setRequiresSecret(false);
+    } catch { /* ignore */ }
+    setLoading(false);
+  };
+
+  useEffect(() => { loadKeys(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const unlockWithSecret = async () => {
+    setSecretError('');
+    const res = await fetch('/api/keys', { headers: { 'x-admin-secret': secretInput } });
+    if (res.status === 401) { setSecretError('Incorrect admin secret'); return; }
+    try { sessionStorage.setItem('nw-admin-secret', secretInput); } catch {}
+    setAdminSecret(secretInput);
+    const data = await res.json();
+    setKeys(Array.isArray(data) ? data : []);
+    setRequiresSecret(false);
+    setLoading(false);
+  };
 
   const generate = async () => {
     if (!newName.trim()) { setError('Enter a name for the key'); return; }
@@ -1610,7 +1642,7 @@ function ApiKeysTab({ t }) {
     try {
       const res  = await fetch('/api/keys', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body:    JSON.stringify({ name: newName.trim() }),
       });
       const data = await res.json();
@@ -1627,7 +1659,7 @@ function ApiKeysTab({ t }) {
 
   const revoke = async (id) => {
     try {
-      await fetch(`/api/keys/${id}`, { method: 'DELETE' });
+      await fetch(`/api/keys/${id}`, { method: 'DELETE', headers: authHeaders() });
       setKeys(prev => prev.filter(k => k.id !== id));
       if (revealedKey?.id === id) setRevealedKey(null);
     } catch { /* ignore */ }
@@ -1637,7 +1669,7 @@ function ApiKeysTab({ t }) {
     try {
       const res  = await fetch(`/api/keys/${id}/refresh`, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body:    '{}',
       });
       const data = await res.json();
@@ -1663,6 +1695,45 @@ function ApiKeysTab({ t }) {
     try { return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); }
     catch { return iso; }
   };
+
+  // Admin secret unlock screen
+  if (requiresSecret) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-xl border p-5 space-y-3"
+          style={{ borderColor: 'var(--wt-warn-500)', backgroundColor: 'color-mix(in oklch, var(--wt-warn-500) 6%, transparent)' }}>
+          <div className="flex items-center gap-2">
+            <Key size={14} style={{ color: 'var(--wt-warn-600)' }} />
+            <span className="text-sm wt-mono font-semibold" style={{ color: 'var(--wt-warn-600)' }}>
+              Admin secret required
+            </span>
+          </div>
+          <p className="text-xs wt-mono leading-relaxed" style={{ color: t.textMuted }}>
+            This instance has <code>ADMIN_SECRET</code> set. Enter the secret to manage API keys.
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={secretInput}
+              onChange={e => { setSecretInput(e.target.value); setSecretError(''); }}
+              onKeyDown={e => e.key === 'Enter' && unlockWithSecret()}
+              placeholder="Admin secret"
+              className="flex-1 wt-input wt-mono"
+              style={{ borderColor: secretError ? 'var(--wt-down-500)' : undefined }}
+            />
+            <button onClick={unlockWithSecret} className="wt-btn wt-btn--primary shrink-0">
+              Unlock
+            </button>
+          </div>
+          {secretError && (
+            <div className="flex items-center gap-1.5 text-xs wt-mono" style={{ color: 'var(--wt-down-600)' }}>
+              <AlertCircle size={11} className="shrink-0" /> {secretError}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -2000,6 +2071,187 @@ function GroupsTab({ t }) {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Backup tab ────────────────────────────────────────────────────────────────
+
+function BackupTab({ t }) {
+  const [importing,    setImporting]    = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [importError,  setImportError]  = useState('');
+  const [preview,      setPreview]      = useState(null);
+  const [mode,         setMode]         = useState('merge');
+
+  const doExport = async () => {
+    const res  = await fetch('/api/config/export');
+    const blob = await res.blob();
+    const cd   = res.headers.get('content-disposition') ?? '';
+    const match = cd.match(/filename="([^"]+)"/);
+    const name  = match?.[1] ?? 'netwatch-config.json';
+    const url   = URL.createObjectURL(blob);
+    const a     = document.createElement('a');
+    a.href = url; a.download = name; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const onFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportError(''); setImportResult(null);
+    try {
+      const json = JSON.parse(await file.text());
+      if (!json.version) throw new Error('Not a valid NetWatch config file');
+      setPreview(json);
+    } catch (err) {
+      setImportError(`Invalid file: ${err.message}`);
+    }
+    e.target.value = '';
+  };
+
+  const doImport = async () => {
+    if (!preview) return;
+    setImporting(true); setImportError('');
+    try {
+      const res  = await fetch('/api/config/import', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...preview, mode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Import failed');
+      setImportResult(data.imported);
+      setPreview(null);
+    } catch (err) {
+      setImportError(err.message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+
+      {/* Export */}
+      <div className="rounded-xl border overflow-hidden" style={{ borderColor: t.cardBorder }}>
+        <div className="px-5 py-3 border-b" style={{ backgroundColor: 'var(--wt-surface-2)', borderColor: t.cardBorder }}>
+          <div className="text-xs wt-mono font-semibold uppercase tracking-wider" style={{ color: t.textSecondary }}>Export</div>
+          <div className="text-xs wt-mono mt-0.5" style={{ color: t.textMuted }}>
+            Download monitors, groups, maintenance events, and non-secret settings as JSON.
+          </div>
+        </div>
+        <div className="px-5 py-4 space-y-3" style={{ backgroundColor: t.cardBg }}>
+          <p className="text-xs wt-mono leading-relaxed" style={{ color: t.textMuted }}>
+            Credentials (passwords, tokens) are excluded. Re-enter them after restoring.
+          </p>
+          <button onClick={doExport} className="wt-btn wt-btn--primary">
+            <Download size={13} /> Download config
+          </button>
+        </div>
+      </div>
+
+      {/* Import */}
+      <div className="rounded-xl border overflow-hidden" style={{ borderColor: t.cardBorder }}>
+        <div className="px-5 py-3 border-b" style={{ backgroundColor: 'var(--wt-surface-2)', borderColor: t.cardBorder }}>
+          <div className="text-xs wt-mono font-semibold uppercase tracking-wider" style={{ color: t.textSecondary }}>Import</div>
+          <div className="text-xs wt-mono mt-0.5" style={{ color: t.textMuted }}>Restore from a previously exported config file.</div>
+        </div>
+        <div className="px-5 py-4 space-y-4" style={{ backgroundColor: t.cardBg }}>
+
+          {/* Mode */}
+          <div>
+            <label className="block text-xs wt-mono uppercase tracking-wider mb-2" style={{ color: t.textMuted }}>Import mode</label>
+            <div className="flex gap-2">
+              {[
+                { value: 'merge',   label: 'Merge',   desc: 'Add to existing data' },
+                { value: 'replace', label: 'Replace', desc: 'Clear then restore' },
+              ].map(({ value, label, desc }) => (
+                <button key={value} onClick={() => setMode(value)}
+                  className="flex-1 px-3 py-2.5 rounded-lg border text-left transition-all"
+                  style={{
+                    borderColor:     mode === value ? (value === 'replace' ? 'var(--wt-warn-500)' : 'var(--wt-brand-400)') : t.cardBorder,
+                    backgroundColor: mode === value ? (value === 'replace' ? 'color-mix(in oklch, var(--wt-warn-500) 7%, transparent)' : 'color-mix(in oklch, var(--wt-brand-500) 7%, transparent)') : 'var(--wt-surface-2)',
+                  }}>
+                  <div className="text-xs wt-mono font-semibold"
+                    style={{ color: mode === value ? (value === 'replace' ? 'var(--wt-warn-600)' : 'var(--wt-brand-400)') : t.textSecondary }}>
+                    {label}
+                  </div>
+                  <div className="text-xs wt-mono mt-0.5" style={{ color: t.textFaint }}>{desc}</div>
+                </button>
+              ))}
+            </div>
+            {mode === 'replace' && (
+              <div className="flex items-start gap-1.5 mt-2 text-xs wt-mono" style={{ color: 'var(--wt-warn-600)' }}>
+                <AlertCircle size={11} className="mt-0.5 shrink-0" />
+                Replace mode permanently deletes all existing monitors, groups, and maintenance events.
+              </div>
+            )}
+          </div>
+
+          {/* File picker */}
+          {!preview && (
+            <label
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-dashed cursor-pointer transition-colors"
+              style={{ borderColor: t.cardBorder, color: t.textMuted }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--wt-brand-400)'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = t.cardBorder}>
+              <Upload size={13} />
+              <span className="text-xs wt-mono">Choose config file (.json)</span>
+              <input type="file" accept=".json,application/json" className="sr-only" onChange={onFileChange} />
+            </label>
+          )}
+
+          {/* Preview before commit */}
+          {preview && (
+            <div className="rounded-lg border p-4 space-y-3"
+              style={{ borderColor: 'var(--wt-brand-400)', backgroundColor: 'color-mix(in oklch, var(--wt-brand-500) 5%, transparent)' }}>
+              <div className="text-xs wt-mono font-semibold" style={{ color: 'var(--wt-brand-400)' }}>Ready to import</div>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                {[
+                  { label: 'Monitors',    count: preview.monitors?.length    ?? 0 },
+                  { label: 'Groups',      count: preview.groups?.length      ?? 0 },
+                  { label: 'Maintenance', count: preview.maintenance?.length ?? 0 },
+                ].map(({ label, count }) => (
+                  <div key={label}>
+                    <div className="text-xl wt-mono font-bold" style={{ color: t.textPrimary }}>{count}</div>
+                    <div className="text-xs wt-mono" style={{ color: t.textMuted }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="text-xs wt-mono" style={{ color: t.textFaint }}>
+                Exported {preview.exportedAt ? new Date(preview.exportedAt).toLocaleString() : '—'}
+                {preview.netwatchVersion ? ` · v${preview.netwatchVersion}` : ''}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={doImport} disabled={importing}
+                  className="wt-btn wt-btn--primary disabled:opacity-60">
+                  {importing
+                    ? <><Loader size={12} className="animate-spin" /> Importing…</>
+                    : <><Upload size={12} /> Confirm import</>}
+                </button>
+                <button onClick={() => setPreview(null)} className="wt-btn wt-btn--ghost">Cancel</button>
+              </div>
+            </div>
+          )}
+
+          {/* Success */}
+          {importResult && (
+            <div className="flex items-center gap-2 text-xs wt-mono p-3 rounded-lg"
+              style={{ backgroundColor: 'color-mix(in oklch, var(--wt-up-500) 7%, transparent)', color: 'var(--wt-up-600)' }}>
+              <CheckCircle size={13} />
+              Imported {importResult.monitors} monitors, {importResult.groups} groups,
+              {' '}{importResult.maintenance} maintenance events. Reload the page to see changes.
+            </div>
+          )}
+
+          {/* Error */}
+          {importError && (
+            <div className="flex items-center gap-1.5 text-xs wt-mono" style={{ color: 'var(--wt-down-600)' }}>
+              <AlertCircle size={11} className="shrink-0" /> {importError}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

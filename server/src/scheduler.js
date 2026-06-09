@@ -261,6 +261,57 @@ export function stopMonitor(id) {
   if (timer) { clearInterval(timer); timers.delete(id); }
 }
 
+// ── Recurring maintenance ─────────────────────────────────────────────────────
+
+function advanceDate(isoDate, recurrence) {
+  const d = new Date(isoDate);
+  if (recurrence === 'daily')   d.setUTCDate(d.getUTCDate() + 1);
+  if (recurrence === 'weekly')  d.setUTCDate(d.getUTCDate() + 7);
+  if (recurrence === 'monthly') d.setUTCMonth(d.getUTCMonth() + 1);
+  return d.toISOString();
+}
+
+function spawnRecurringOccurrences() {
+  const now = new Date().toISOString();
+  // Find recurring events that have ended and have no child yet
+  const due = db.prepare(`
+    SELECT * FROM maintenance_events
+    WHERE  recurrence IS NOT NULL
+      AND  end_at < ?
+      AND  NOT EXISTS (
+             SELECT 1 FROM maintenance_events child
+             WHERE  child.parent_id = maintenance_events.id
+           )
+  `).all(now);
+
+  for (const row of due) {
+    const nextStart = advanceDate(row.start_at, row.recurrence);
+    const nextEnd   = advanceDate(row.end_at,   row.recurrence);
+
+    // Stop if series has an end date and the next occurrence would start after it
+    if (row.recurrence_end && nextStart > row.recurrence_end) continue;
+
+    const newId = randomUUID();
+    db.prepare(`
+      INSERT INTO maintenance_events
+        (id, name, note, start_at, end_at, recurrence, recurrence_end, parent_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(newId, row.name, row.note, nextStart, nextEnd,
+           row.recurrence, row.recurrence_end ?? null, row.id);
+
+    // Copy monitor assignments
+    const members = db.prepare(
+      'SELECT monitor_id FROM maintenance_monitors WHERE event_id = ?'
+    ).all(row.id);
+    const insertMember = db.prepare(
+      'INSERT OR IGNORE INTO maintenance_monitors (event_id, monitor_id) VALUES (?, ?)'
+    );
+    for (const m of members) insertMember.run(newId, m.monitor_id);
+
+    console.log(`[netwatch:scheduler] spawned next ${row.recurrence} occurrence for "${row.name}" → ${nextStart}`);
+  }
+}
+
 /** Restore schedules on startup. */
 export function initScheduler() {
   const monitors = db.prepare('SELECT * FROM monitors').all().map(rowToMonitor);
@@ -268,4 +319,8 @@ export function initScheduler() {
     scheduleMonitor(m.id, m.interval);
   }
   console.log(`[netwatch:scheduler] ${monitors.length} monitor(s) scheduled`);
+
+  // Check for due recurring maintenance events every 60 seconds
+  spawnRecurringOccurrences();
+  setInterval(spawnRecurringOccurrences, 60_000);
 }

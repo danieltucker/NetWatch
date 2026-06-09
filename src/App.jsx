@@ -391,7 +391,7 @@ export default function App() {
         <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em', color: 'var(--wt-text)' }}>
           Net<span style={{ color: 'var(--nw-ink)' }}>Watch</span>
         </span>
-        <span className="wt-chip wt-chip--plain">v6.10.1</span>
+        <span className="wt-chip wt-chip--plain">v6.11.0</span>
 
         <div className="flex items-center gap-2" style={{ marginLeft: 'auto' }}>
           {/* live / offline indicator */}
@@ -584,6 +584,7 @@ export default function App() {
 
         {!loading && !error && view === 'incidents' && (
           <IncidentsPage
+            alerts={alerts}
             monitors={userMonitors}
             onOpenDetail={(mon, tab, ts) => {
               setIncidentTimestamp(ts ?? null);
@@ -641,6 +642,7 @@ export default function App() {
             ) : viewMode === 'list' ? (
               <MonitorListView
                 monitors={filteredMonitors}
+                groups={groupByEnabled ? groups : null}
                 onCardClick={mon => openDetail(mon, 'history')}
                 onEdit={mon => openDetail(mon, 'configure')}
                 t={t}
@@ -790,77 +792,103 @@ export default function App() {
 
 const CHECK_LABELS = { http: 'HTTP', api: 'API', tcp: 'TCP', icmp: 'ICMP' };
 
-function MonitorListView({ monitors, onCardClick, onEdit, t }) {
+function ListRow({ m, isLast, onCardClick, t }) {
+  const uptimeColor = m.uptimePercent == null ? t.textFaint
+    : m.uptimePercent >= 99  ? 'var(--wt-up-600)'
+    : m.uptimePercent >= 95  ? 'var(--wt-warn-600)'
+    : 'var(--wt-down-600)';
+  const pingColor = m.status === 'down'     ? 'var(--wt-down-600)'
+    : m.status === 'degraded' ? 'var(--wt-warn-600)'
+    : t.textPrimary;
+  const visibleTags = m.tags?.filter(tag => tag !== '_ref') ?? [];
+
   return (
-    <div className="wt-card overflow-hidden">
-      {monitors.map((m, i) => {
-        const isLast = i === monitors.length - 1;
-        const uptimeColor = m.uptimePercent == null ? t.textFaint
-          : m.uptimePercent >= 99  ? 'var(--wt-up-600)'
-          : m.uptimePercent >= 95  ? 'var(--wt-warn-600)'
-          : 'var(--wt-down-600)';
-        const pingColor = m.status === 'down' ? 'var(--wt-down-600)'
-          : m.status === 'degraded' ? 'var(--wt-warn-600)'
-          : t.textPrimary;
+    <div
+      className="flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors"
+      style={{ borderBottom: isLast ? 'none' : `1px solid var(--wt-border)` }}
+      onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--wt-surface-2)'}
+      onMouseLeave={e => e.currentTarget.style.backgroundColor = ''}
+      onClick={() => onCardClick(m)}>
 
-        return (
-          <div
-            key={m.id}
-            className="flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors"
-            style={{
-              borderBottom: isLast ? 'none' : `1px solid var(--wt-border)`,
-            }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--wt-surface-2)'}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = ''}
-            onClick={() => onCardClick(m)}>
+      {/* Status dot */}
+      <StatusDot status={m.status} />
 
-            {/* Status dot */}
-            <StatusDot status={m.status} />
+      {/* Name */}
+      <span className="text-sm font-medium truncate min-w-0" style={{ color: t.textPrimary, flex: '1 1 0' }}>
+        {m.label}
+      </span>
 
-            {/* Name */}
-            <span className="flex-1 min-w-0 text-sm font-medium truncate" style={{ color: t.textPrimary }}>
-              {m.label}
-            </span>
+      {/* Tags */}
+      {visibleTags.length > 0 && (
+        <div className="hidden md:flex items-center gap-1 shrink-0">
+          {visibleTags.slice(0, 2).map(tag => (
+            <span key={tag} className="wt-chip wt-chip--plain" style={{ fontSize: 10 }}>{tag}</span>
+          ))}
+          {visibleTags.length > 2 && (
+            <span className="wt-mono text-xs" style={{ color: t.textFaint }}>+{visibleTags.length - 2}</span>
+          )}
+        </div>
+      )}
 
-            {/* Check type chip */}
-            <span className="wt-mono text-[10px] px-1.5 py-0.5 rounded border shrink-0"
-              style={{ color: t.textFaint, borderColor: 'var(--wt-border)', fontSize: 10 }}>
-              {CHECK_LABELS[m.checkType] ?? (m.checkType ?? 'HTTP').toUpperCase()}
-            </span>
+      {/* Check type */}
+      <span className="wt-mono text-[10px] px-1.5 py-0.5 rounded border shrink-0"
+        style={{ color: t.textFaint, borderColor: 'var(--wt-border)' }}>
+        {CHECK_LABELS[m.checkType] ?? (m.checkType ?? 'HTTP').toUpperCase()}
+      </span>
 
-            {/* Ping */}
-            <span className="wt-mono text-xs w-16 text-right shrink-0" style={{ color: pingColor }}>
-              {m.currentPing != null ? `${m.currentPing}ms` : '—'}
-            </span>
+      {/* Ping */}
+      <span className="wt-mono text-xs w-16 text-right shrink-0" style={{ color: pingColor }}>
+        {m.currentPing != null ? `${m.currentPing}ms` : '—'}
+      </span>
 
-            {/* Uptime */}
-            <span className="wt-mono text-xs w-14 text-right shrink-0" style={{ color: uptimeColor }}>
-              {m.uptimePercent != null ? `${m.uptimePercent.toFixed(1)}%` : '—'}
-            </span>
+      {/* Uptime */}
+      <span className="wt-mono text-xs w-14 text-right shrink-0" style={{ color: uptimeColor }}>
+        {m.uptimePercent != null ? `${m.uptimePercent.toFixed(1)}%` : '—'}
+      </span>
+    </div>
+  );
+}
 
-            {/* Last checked */}
-            <span className="wt-mono text-xs w-24 text-right shrink-0 hidden md:block" style={{ color: t.textFaint }}>
-              {m.lastChecked
-                ? new Date(m.lastChecked).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
-                : '—'}
-            </span>
+function MonitorListView({ monitors, groups, onCardClick, onEdit, t }) {
+  // Flat list (no grouping)
+  if (!groups?.length) {
+    return (
+      <div className="wt-card overflow-hidden">
+        {monitors.map((m, i) => (
+          <ListRow key={m.id} m={m} isLast={i === monitors.length - 1} onCardClick={onCardClick} t={t} />
+        ))}
+      </div>
+    );
+  }
 
-            {/* Tags */}
-            {m.tags?.filter(tag => tag !== '_ref').length > 0 && (
-              <div className="hidden lg:flex items-center gap-1 shrink-0">
-                {m.tags.filter(tag => tag !== '_ref').slice(0, 2).map(tag => (
-                  <span key={tag} className="wt-chip wt-chip--plain" style={{ fontSize: 10 }}>{tag}</span>
-                ))}
-                {m.tags.filter(tag => tag !== '_ref').length > 2 && (
-                  <span className="wt-mono text-xs" style={{ color: t.textFaint }}>
-                    +{m.tags.filter(tag => tag !== '_ref').length - 2}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        );
+  // Grouped list
+  const groupedIds   = new Set(groups.flatMap(g => g.monitorIds ?? []));
+  const sorted       = [...groups].sort((a, b) => a.displayOrder - b.displayOrder);
+  const ungrouped    = monitors.filter(m => !groupedIds.has(m.id));
+
+  const renderSection = (label, items) => {
+    if (!items.length) return null;
+    return (
+      <div key={label}>
+        <div className="px-1 pb-2 pt-1">
+          <span className="wt-eyebrow">{label}</span>
+        </div>
+        <div className="wt-card overflow-hidden">
+          {items.map((m, i) => (
+            <ListRow key={m.id} m={m} isLast={i === items.length - 1} onCardClick={onCardClick} t={t} />
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      {sorted.map(g => {
+        const gMonitors = monitors.filter(m => g.monitorIds?.includes(m.id));
+        return renderSection(g.name, gMonitors);
       })}
+      {renderSection('Ungrouped', ungrouped)}
     </div>
   );
 }

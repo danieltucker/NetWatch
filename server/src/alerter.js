@@ -33,7 +33,7 @@ function subject(monitor, event) {
     degraded:  'DEGRADED',
     recovered: 'RECOVERED',
   }[event] ?? event.toUpperCase();
-  return `[WatchTower] ${monitor.label} is ${label}`;
+  return `[NetWatch] ${monitor.label} is ${label}`;
 }
 
 function plainText(monitor, event) {
@@ -42,7 +42,7 @@ function plainText(monitor, event) {
     degraded:  `DEGRADED (ping over ${monitor.degradedThreshold ?? '?'}ms threshold)`,
     recovered: 'RECOVERED',
   }[event] ?? event.toUpperCase();
-  return `WatchTower Alert\n\n${monitor.label} is ${status}\nTarget: ${monitor.target}\nTime: ${new Date().toLocaleString()}`;
+  return `NetWatch Alert\n\n${monitor.label} is ${status}\nTarget: ${monitor.target}\nTime: ${new Date().toLocaleString()}`;
 }
 
 function htmlBody(monitor, event) {
@@ -57,7 +57,7 @@ function htmlBody(monitor, event) {
     : '';
   return `
     <div style="font-family:monospace;max-width:480px;padding:24px;background:#0d1117;color:#e6edf3;border-radius:8px">
-      <div style="font-size:11px;letter-spacing:0.1em;color:#6e7681;margin-bottom:16px">WATCHTOWER ALERT</div>
+      <div style="font-size:11px;letter-spacing:0.1em;color:#6e7681;margin-bottom:16px">NETWATCH ALERT</div>
       <div style="font-size:20px;font-weight:bold;color:${color};margin-bottom:12px">${escHtml(monitor.label)} is ${status}</div>
       <div style="font-size:13px;color:#8d96a0;line-height:1.6">
         <div>Target: <span style="color:#e6edf3">${escHtml(monitor.target)}</span></div>
@@ -80,7 +80,7 @@ export async function sendTelegramAlert(monitor, event, overrides = {}) {
   const statusText = { down: 'DOWN', degraded: 'DEGRADED', recovered: 'RECOVERED' }[event] ?? event.toUpperCase();
   const detail = event === 'degraded' && monitor.degradedThreshold
     ? `\nThreshold: ${monitor.degradedThreshold}ms` : '';
-  const text = `${icon} <b>WatchTower</b>\n\n<b>${monitor.label}</b> is <b>${statusText}</b>\n<code>${monitor.target}</code>${detail}\n${new Date().toLocaleString()}`;
+  const text = `${icon} <b>NetWatch</b>\n\n<b>${monitor.label}</b> is <b>${statusText}</b>\n<code>${monitor.target}</code>${detail}\n${new Date().toLocaleString()}`;
 
   await got.post(`https://api.telegram.org/bot${token}/sendMessage`, {
     json: { chat_id: chatId, text, parse_mode: 'HTML' },

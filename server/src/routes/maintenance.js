@@ -4,6 +4,8 @@ import { db, rowToMaintenanceEvent } from '../db/index.js';
 
 const router = Router();
 
+const VALID_RECURRENCES = new Set(['daily', 'weekly', 'monthly']);
+
 function getEventWithMonitors(id) {
   const row = db.prepare('SELECT * FROM maintenance_events WHERE id = ?').get(id);
   if (!row) return null;
@@ -46,16 +48,20 @@ router.get('/active', (_req, res) => {
 
 // ── POST /api/maintenance ─────────────────────────────────────────────────────
 router.post('/', (req, res) => {
-  const { name, startAt, endAt, monitorIds = [], note = '' } = req.body;
+  const { name, startAt, endAt, monitorIds = [], note = '', recurrence = null, recurrenceEnd = null } = req.body;
   if (!name?.trim())  return res.status(400).json({ error: 'name is required' });
   if (!startAt)       return res.status(400).json({ error: 'startAt is required' });
   if (!endAt)         return res.status(400).json({ error: 'endAt is required' });
   if (startAt >= endAt) return res.status(400).json({ error: 'endAt must be after startAt' });
+  if (recurrence && !VALID_RECURRENCES.has(recurrence)) {
+    return res.status(400).json({ error: 'recurrence must be daily, weekly, or monthly' });
+  }
 
   const id = randomUUID();
   db.prepare(
-    `INSERT INTO maintenance_events (id, name, note, start_at, end_at) VALUES (?, ?, ?, ?, ?)`
-  ).run(id, name.trim(), note.trim(), startAt, endAt);
+    `INSERT INTO maintenance_events (id, name, note, start_at, end_at, recurrence, recurrence_end)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, name.trim(), note.trim(), startAt, endAt, recurrence ?? null, recurrenceEnd ?? null);
 
   const insert = db.prepare('INSERT OR IGNORE INTO maintenance_monitors (event_id, monitor_id) VALUES (?, ?)');
   for (const mid of monitorIds) insert.run(id, mid);
@@ -70,11 +76,13 @@ router.put('/:id', (req, res) => {
     return res.status(404).json({ error: 'Maintenance event not found' });
   }
 
-  const { name, startAt, endAt, note, monitorIds } = req.body;
-  if (name    !== undefined) db.prepare('UPDATE maintenance_events SET name     = ? WHERE id = ?').run(name.trim(), id);
-  if (note    !== undefined) db.prepare('UPDATE maintenance_events SET note     = ? WHERE id = ?').run(note.trim(), id);
-  if (startAt !== undefined) db.prepare('UPDATE maintenance_events SET start_at = ? WHERE id = ?').run(startAt, id);
-  if (endAt   !== undefined) db.prepare('UPDATE maintenance_events SET end_at   = ? WHERE id = ?').run(endAt, id);
+  const { name, startAt, endAt, note, monitorIds, recurrence, recurrenceEnd } = req.body;
+  if (name          !== undefined) db.prepare('UPDATE maintenance_events SET name          = ? WHERE id = ?').run(name.trim(), id);
+  if (note          !== undefined) db.prepare('UPDATE maintenance_events SET note          = ? WHERE id = ?').run(note.trim(), id);
+  if (startAt       !== undefined) db.prepare('UPDATE maintenance_events SET start_at      = ? WHERE id = ?').run(startAt, id);
+  if (endAt         !== undefined) db.prepare('UPDATE maintenance_events SET end_at        = ? WHERE id = ?').run(endAt, id);
+  if (recurrence    !== undefined) db.prepare('UPDATE maintenance_events SET recurrence    = ? WHERE id = ?').run(recurrence ?? null, id);
+  if (recurrenceEnd !== undefined) db.prepare('UPDATE maintenance_events SET recurrence_end = ? WHERE id = ?').run(recurrenceEnd ?? null, id);
 
   if (Array.isArray(monitorIds)) {
     db.prepare('DELETE FROM maintenance_monitors WHERE event_id = ?').run(id);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CheckCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { formatTimestamp } from '../types/monitor';
 
@@ -21,53 +21,30 @@ function LiveElapsed({ since }) {
   return <span>{formatDuration(elapsed)}</span>;
 }
 
-function computeAllIncidents(monitors) {
-  const result = [];
-  for (const monitor of monitors) {
-    const history = monitor.history ?? [];
-    let start = null, startIdx = null;
-    for (let i = 0; i < history.length; i++) {
-      const isDown = history[i].status === 'down';
-      if (isDown && start === null) {
-        start = history[i].timestamp;
-        startIdx = i;
-      } else if (!isDown && start !== null) {
-        result.push({
-          monitorId:    monitor.id,
-          monitorLabel: monitor.label,
-          start,
-          end:          history[i].timestamp,
-          durationMs:   new Date(history[i].timestamp) - new Date(start),
-          error:        history[startIdx]?.error ?? null,
-          ongoing:      false,
-        });
-        start = null; startIdx = null;
-      }
-    }
-    if (start !== null) {
-      result.push({
-        monitorId:    monitor.id,
-        monitorLabel: monitor.label,
-        start,
-        end:          null,
-        durationMs:   null,
-        error:        history[startIdx]?.error ?? null,
-        ongoing:      true,
-      });
-    }
-  }
-  // Ongoing first, then by start time descending
-  return result.sort((a, b) => {
+// Map server alert records to the incident shape the table expects
+function alertsToIncidents(alerts) {
+  return alerts.map(a => ({
+    id:           a.id,
+    monitorId:    a.monitorId,
+    monitorLabel: a.monitorLabel,
+    type:         a.type,            // 'outage' | 'degraded'
+    start:        a.startedAt,
+    end:          a.resolvedAt ?? null,
+    durationMs:   a.resolvedAt
+                    ? new Date(a.resolvedAt) - new Date(a.startedAt)
+                    : null,
+    ongoing:      a.resolvedAt === null,
+  })).sort((a, b) => {
     if (a.ongoing !== b.ongoing) return a.ongoing ? -1 : 1;
     return new Date(b.start) - new Date(a.start);
   });
 }
 
-export function IncidentsPage({ monitors, onOpenDetail }) {
+export function IncidentsPage({ alerts, monitors, onOpenDetail }) {
   const { t } = useTheme();
   const [filter, setFilter] = useState('all');
 
-  const allIncidents = useMemo(() => computeAllIncidents(monitors), [monitors]);
+  const allIncidents = useMemo(() => alertsToIncidents(alerts), [alerts]);
 
   const filtered = useMemo(() => allIncidents.filter(inc => {
     if (filter === 'active')   return inc.ongoing;
@@ -131,16 +108,13 @@ export function IncidentsPage({ monitors, onOpenDetail }) {
                 <th className="px-4 py-2.5 text-left">
                   <span className="wt-eyebrow">Duration</span>
                 </th>
-                <th className="px-4 py-2.5 text-left hidden md:table-cell">
-                  <span className="wt-eyebrow">Error</span>
-                </th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((inc, i) => {
+              {filtered.map((inc) => {
                 const monitor = findMonitor(inc.monitorId);
                 return (
-                  <tr key={i}
+                  <tr key={inc.id}
                     className="border-b transition-colors cursor-pointer"
                     style={{ borderColor: 'var(--wt-border)' }}
                     onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--wt-surface-2)'}
@@ -157,9 +131,15 @@ export function IncidentsPage({ monitors, onOpenDetail }) {
                     {/* Status pill */}
                     <td className="px-4 py-3">
                       {inc.ongoing ? (
-                        <span className="wt-pill wt-pill--down">
-                          <span className="wt-pill__dot" />Outage
-                        </span>
+                        inc.type === 'degraded' ? (
+                          <span className="wt-pill wt-pill--warn">
+                            <span className="wt-pill__dot" />Degraded
+                          </span>
+                        ) : (
+                          <span className="wt-pill wt-pill--down">
+                            <span className="wt-pill__dot" />Down
+                          </span>
+                        )
                       ) : (
                         <span className="wt-pill wt-pill--muted">Resolved</span>
                       )}
@@ -175,24 +155,12 @@ export function IncidentsPage({ monitors, onOpenDetail }) {
                     {/* Duration */}
                     <td className="px-4 py-3">
                       <span className="wt-mono text-xs"
-                        style={{ color: inc.ongoing ? 'var(--wt-down-600)' : t.textFaint }}>
+                        style={{ color: inc.ongoing ? (inc.type === 'degraded' ? 'var(--wt-warn-600)' : 'var(--wt-down-600)') : t.textFaint }}>
                         {inc.ongoing
                           ? <LiveElapsed since={inc.start} />
                           : (inc.durationMs ? formatDuration(inc.durationMs) : '—')
                         }
                       </span>
-                    </td>
-
-                    {/* Error snippet */}
-                    <td className="px-4 py-3 hidden md:table-cell max-w-[200px]">
-                      {inc.error ? (
-                        <span className="wt-mono text-xs truncate block"
-                          style={{ color: t.textFaint }} title={inc.error}>
-                          {inc.error}
-                        </span>
-                      ) : (
-                        <span className="wt-mono text-xs" style={{ color: t.textFaint }}>—</span>
-                      )}
                     </td>
                   </tr>
                 );

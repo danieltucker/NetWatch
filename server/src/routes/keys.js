@@ -5,6 +5,19 @@ import { db }                           from '../db/index.js';
 
 const router = Router();
 
+// If ADMIN_SECRET is set, all key-management endpoints require the header.
+// If it is not set the endpoints are open (backward-compatible local installs).
+function requireAdminSecret(req, res, next) {
+  const secret = process.env.ADMIN_SECRET;
+  if (!secret) return next();
+  if (req.headers['x-admin-secret'] !== secret) {
+    return res.status(401).json({ error: 'Admin secret required' });
+  }
+  next();
+}
+
+router.use(requireAdminSecret);
+
 function hashKey(raw) {
   return createHash('sha256').update(raw).digest('hex');
 }

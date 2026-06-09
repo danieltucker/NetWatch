@@ -139,8 +139,11 @@ for (const sql of [
   `ALTER TABLE monitors      ADD COLUMN auth_pass TEXT`,
   `ALTER TABLE monitors      ADD COLUMN auth_token TEXT`,
   `ALTER TABLE monitors      ADD COLUMN request_headers TEXT`,
-  `ALTER TABLE check_history ADD COLUMN maintenance_event_id TEXT`,
-  `ALTER TABLE alerts         ADD COLUMN maintenance_event_id TEXT`,
+  `ALTER TABLE check_history       ADD COLUMN maintenance_event_id TEXT`,
+  `ALTER TABLE alerts               ADD COLUMN maintenance_event_id TEXT`,
+  `ALTER TABLE maintenance_events   ADD COLUMN recurrence      TEXT`,
+  `ALTER TABLE maintenance_events   ADD COLUMN recurrence_end  TEXT`,
+  `ALTER TABLE maintenance_events   ADD COLUMN parent_id       TEXT`,
 ]) {
   try { db.exec(sql); } catch { /* column already exists */ }
 }
@@ -211,13 +214,16 @@ export function rowToGroup(row) {
 
 export function rowToMaintenanceEvent(row) {
   return {
-    id:        row.id,
-    name:      row.name,
-    note:      row.note,
-    startAt:   row.start_at,
-    endAt:     row.end_at,
-    createdAt: row.created_at,
-    monitorIds: row.monitor_ids ? JSON.parse(row.monitor_ids) : [],
+    id:             row.id,
+    name:           row.name,
+    note:           row.note,
+    startAt:        row.start_at,
+    endAt:          row.end_at,
+    recurrence:     row.recurrence     ?? null,
+    recurrenceEnd:  row.recurrence_end ?? null,
+    parentId:       row.parent_id      ?? null,
+    createdAt:      row.created_at,
+    monitorIds:     row.monitor_ids ? JSON.parse(row.monitor_ids) : [],
   };
 }
 
