@@ -378,7 +378,7 @@ export default function App() {
         <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em', color: 'var(--wt-text)' }}>
           Net<span style={{ color: 'var(--nw-ink)' }}>Watch</span>
         </span>
-        <span className="wt-chip wt-chip--plain">v6.12.0</span>
+        <span className="wt-chip wt-chip--plain">v6.12.1</span>
 
         <div className="flex items-center gap-2" style={{ marginLeft: 'auto' }}>
           {/* live / offline indicator */}
@@ -575,7 +575,9 @@ export default function App() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <HistoryRangeControl historyRange={historyRange} onChange={setHistoryRange} t={t} isDark={isDark} />
+                <div className="hidden sm:block">
+                  <HistoryRangeControl historyRange={historyRange} onChange={setHistoryRange} t={t} isDark={isDark} />
+                </div>
                 <button onClick={refresh} className="wt-btn wt-btn--ghost wt-btn--sm" title="Refresh">
                   <RefreshCw size={14} />
                 </button>
@@ -707,6 +709,7 @@ export default function App() {
       {showSettings && (
         <SettingsPanel
           onClose={() => setShowSettings(false)}
+          onImportSuccess={refresh}
           chartYMax={chartYMax}
           onChartYMaxChange={handleChartYMaxChange}
           alertsAutoOpen={alertsAutoOpen}
@@ -988,7 +991,7 @@ function MonitorSearch({ value, onChange }) {
   }, [onChange]);
 
   return (
-    <div className="relative flex items-center" style={{ width: 240 }}>
+    <div className="relative flex items-center" style={{ flex: '1 1 0', minWidth: 120, maxWidth: 240 }}>
       <Search size={13} className="absolute left-2.5 pointer-events-none" style={{ color: 'var(--wt-text-faint)' }} />
       <input
         ref={ref}

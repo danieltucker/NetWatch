@@ -207,9 +207,10 @@ function MetricCell({ label, value, unit, valueColor, barPct, barColor, trendTex
     <div style={{ padding: '12px 14px 10px' }}>
       <div className="flex items-center justify-between mb-1.5">
         <span className="wt-eyebrow">{label}</span>
-        {trendText && (
-          <span className={`wt-trend ${trendGood ? 'wt-trend--up' : 'wt-trend--down'}`}>{trendText}</span>
-        )}
+        <span className={`wt-trend ${trendGood ? 'wt-trend--up' : 'wt-trend--down'}`}
+          style={{ visibility: trendText ? 'visible' : 'hidden' }}>
+          {trendText ?? ' '}
+        </span>
       </div>
       <div className="wt-mono font-semibold leading-none mb-2" style={{ fontSize: 22, letterSpacing: '-0.02em', color: valueColor }}>
         {value}{unit && <span style={{ fontSize: '0.55em', color: t.textMuted, marginLeft: 1 }}>{unit}</span>}

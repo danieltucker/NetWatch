@@ -46,7 +46,7 @@ const CHANNEL_VALIDATION = [
 
 // ── SettingsPanel ─────────────────────────────────────────────────────────────
 
-export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, alertsAutoOpen = 'outage', onAlertsAutoOpenChange }) {
+export function SettingsPanel({ onClose, onImportSuccess, chartYMax = 'auto', onChartYMaxChange, alertsAutoOpen = 'outage', onAlertsAutoOpenChange }) {
   const { t, isDark, themeMode, setThemeMode } = useTheme();
   const [activeTab,        setActiveTab]        = useState('general');
   const [mobileContentOpen, setMobileContentOpen] = useState(false);
@@ -341,7 +341,7 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
           {/* Version label — desktop only */}
           <div className="hidden sm:block px-5 py-5">
             <div className="text-xs wt-mono" style={{ color: t.textFaint }}>
-              NetWatch v6.12.0
+              NetWatch v6.12.1
             </div>
           </div>
         </aside>
@@ -435,7 +435,7 @@ export function SettingsPanel({ onClose, chartYMax = 'auto', onChartYMaxChange, 
               <ApiKeysTab t={t} />
             )}
             {activeTab === 'backup' && (
-              <BackupTab t={t} />
+              <BackupTab t={t} onImportSuccess={onImportSuccess} />
             )}
             {activeTab === 'notifications' && (
               <NotificationsTab
@@ -2077,7 +2077,7 @@ function GroupsTab({ t }) {
 
 // ── Backup tab ────────────────────────────────────────────────────────────────
 
-function BackupTab({ t }) {
+function BackupTab({ t, onImportSuccess }) {
   const [importing,    setImporting]    = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [importError,  setImportError]  = useState('');
@@ -2122,6 +2122,7 @@ function BackupTab({ t }) {
       if (!res.ok) throw new Error(data.error || 'Import failed');
       setImportResult(data.imported);
       setPreview(null);
+      onImportSuccess?.();
     } catch (err) {
       setImportError(err.message);
     } finally {
@@ -2240,7 +2241,7 @@ function BackupTab({ t }) {
               style={{ backgroundColor: 'color-mix(in oklch, var(--wt-up-500) 7%, transparent)', color: 'var(--wt-up-600)' }}>
               <CheckCircle size={13} />
               Imported {importResult.monitors} monitors, {importResult.groups} groups,
-              {' '}{importResult.maintenance} maintenance events. Reload the page to see changes.
+              {' '}{importResult.maintenance} maintenance events.
             </div>
           )}
 
