@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Radio, Activity, AlertTriangle, Bell, Tag as TagIcon, Settings, Code, X, Menu, Search, Zap, Calendar, LayoutGrid, List, AlertCircle as IncidentIcon, Wrench, Layers, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Radio, Activity, AlertTriangle, Bell, Tag as TagIcon, Settings, Code, X, Menu, Search, Zap, Calendar, LayoutGrid, List, AlertCircle as IncidentIcon, Wrench, Layers, RefreshCw, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
 import {
   DndContext, closestCenter,
   KeyboardSensor, PointerSensor,
@@ -147,10 +147,6 @@ export default function App() {
   const [searchQuery,    setSearchQuery]    = useState('');
   const [statusFilter,   setStatusFilter]   = useState('all');
   const [alertsExpanded,          setAlertsExpanded]          = useState(false);
-  const [sidebarCollapsed,        setSidebarCollapsed]        = useState(() => {
-    try { return localStorage.getItem('nw-sidebar-collapsed') === 'true'; } catch { return false; }
-  });
-  const [sidebarHovered,          setSidebarHovered]          = useState(false);
   const [view,                    setView]                    = useState('monitors'); // 'monitors' | 'incidents' | 'maintenance'
   const [viewMode,                setViewMode]                = useState('grid');     // 'grid' | 'list'
   const [groupByEnabled,          setGroupByEnabled]          = useState(() => {
@@ -356,17 +352,8 @@ export default function App() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  // Sidebar status rows with live counts from user monitors
-  const statusRows = [
-    { label: 'All',      value: 'all',      status: null,       count: userMonitors.length },
-    { label: 'Up',       value: 'up',       status: 'up',       count: userMonitors.filter(m => m.status === 'up').length },
-    { label: 'Degraded', value: 'degraded', status: 'degraded', count: userMonitors.filter(m => m.status === 'degraded' || (m.status === 'up' && m.degradedThreshold != null && m.currentPing != null && m.currentPing > m.degradedThreshold)).length },
-    { label: 'Down',     value: 'down',     status: 'down',     count: userMonitors.filter(m => m.status === 'down').length },
-    { label: 'Paused',   value: 'pending',  status: 'pending',  count: userMonitors.filter(m => m.status === 'pending').length },
-  ];
-
   return (
-    <div className={`app ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className="app">
 
       {/* ── Console (always mounted, toggled with `) ─────────────────────────── */}
       <ConsolePanel monitors={monitors} onRefresh={refresh} />
@@ -391,7 +378,7 @@ export default function App() {
         <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em', color: 'var(--wt-text)' }}>
           Net<span style={{ color: 'var(--nw-ink)' }}>Watch</span>
         </span>
-        <span className="wt-chip wt-chip--plain">v6.11.0</span>
+        <span className="wt-chip wt-chip--plain">v6.12.0</span>
 
         <div className="flex items-center gap-2" style={{ marginLeft: 'auto' }}>
           {/* live / offline indicator */}
@@ -420,9 +407,6 @@ export default function App() {
               </>
             )}
           </div>
-
-          {/* search — desktop */}
-          <div className="hidden wide:block"><MonitorSearch value={searchQuery} onChange={setSearchQuery} t={t} /></div>
 
           {/* ghost icon buttons — desktop */}
           <div className="hidden wide:flex items-center gap-1">
@@ -457,9 +441,7 @@ export default function App() {
 
       {/* ── Sidebar ── */}
       <aside
-        className={`app__side ${mobileMenuOpen ? 'is-open' : ''} ${sidebarCollapsed && sidebarHovered ? 'is-expanded' : ''}`}
-        onMouseEnter={() => sidebarCollapsed && setSidebarHovered(true)}
-        onMouseLeave={() => setSidebarHovered(false)}>
+        className={`app__side ${mobileMenuOpen ? 'is-open' : ''}`}>
         {/* ── Scrollable content area ── */}
         <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }}>
 
@@ -472,18 +454,6 @@ export default function App() {
           <button onClick={() => { setEmbedMonitor(undefined); setMobileMenuOpen(false); }} className="wt-btn wt-btn--ghost wt-btn--sm" title="Embed"><Code size={14} /></button>
           <button onClick={() => { setShowSettings(true); setMobileMenuOpen(false); }} className="wt-btn wt-btn--ghost wt-btn--sm" title="Settings"><Settings size={14} /></button>
         </div>
-
-        {/* STATUS — group header kept in DOM (opacity:0 when collapsed) so items below don't shift */}
-        <div className="side__group">Status</div>
-        {statusRows.map(row => (
-          <button key={row.value}
-            className={`side__item ${statusFilter === row.value ? 'is-active' : ''} ${!row.status ? 'side__item--no-icon' : ''}`}
-            onClick={() => { setStatusFilter(row.value); setMobileMenuOpen(false); }}>
-            {row.status ? <StatusDot status={row.status} /> : <span style={{ width: 7, height: 7, flexShrink: 0 }} />}
-            <span className="side__item__label">{row.label}</span>
-            <span className="side__item__count">{row.count}</span>
-          </button>
-        ))}
 
         {/* VIEWS */}
         <div className="side__group">Views</div>
@@ -514,8 +484,6 @@ export default function App() {
           )}
         </button>
 
-        {/* Secondary sections — hidden in collapsed mode (below main nav, won't affect Status/Views Y positions) */}
-        <div className="sidebar-secondary">
         {allTags.length > 0 && (
           <>
             <div className="side__group flex items-center justify-between">
@@ -534,37 +502,8 @@ export default function App() {
           </>
         )}
 
-        {/* SORT */}
-        <div className="side__group">Sort</div>
-        <select className="wt-select" value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ fontSize: 13 }}>
-          {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-
-        {/* HISTORY */}
-        <div className="side__group">History</div>
-        <HistoryRangeControl historyRange={historyRange} onChange={setHistoryRange} t={t} isDark={isDark} />
-        </div>{/* end sidebar-secondary */}
-
         </div>{/* end scrollable content */}
 
-        {/* ── Collapse toggle — pinned to bottom, hidden on mobile ── */}
-        <div className="sidebar-collapse-btn pt-3 pb-1 border-t" style={{ borderColor: 'var(--wt-border)' }}>
-          <button
-            onClick={() => {
-              const next = !sidebarCollapsed;
-              setSidebarCollapsed(next);
-              setSidebarHovered(false);
-              try { localStorage.setItem('nw-sidebar-collapsed', String(next)); } catch {}
-            }}
-            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors opacity-40 hover:opacity-100"
-            style={{ color: 'var(--wt-text-muted)' }}
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
-            {sidebarCollapsed
-              ? <PanelLeftOpen  size={14} />
-              : <PanelLeftClose size={14} />}
-            {!sidebarCollapsed && <span className="wt-mono text-xs">Collapse</span>}
-          </button>
-        </div>
       </aside>
 
       {/* ── Main ── */}
@@ -583,132 +522,170 @@ export default function App() {
         {error   && <ErrorState  message={error} t={t} />}
 
         {!loading && !error && view === 'incidents' && (
-          <IncidentsPage
-            alerts={alerts}
-            monitors={userMonitors}
-            onOpenDetail={(mon, tab, ts) => {
-              setIncidentTimestamp(ts ?? null);
-              openDetail(mon, tab);
-            }}
-          />
+          <>
+            <div className="page-header">
+              <div>
+                <div className="page-header__title">Incidents</div>
+                <div className="page-header__subtitle">
+                  {alerts.filter(a => !a.resolvedAt).length > 0
+                    ? `${alerts.filter(a => !a.resolvedAt).length} active`
+                    : 'All clear'}
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <IncidentsPage
+                alerts={alerts}
+                monitors={userMonitors}
+                onOpenDetail={(mon, tab, ts) => {
+                  setIncidentTimestamp(ts ?? null);
+                  openDetail(mon, tab);
+                }}
+              />
+            </div>
+          </>
         )}
 
         {!loading && !error && view === 'maintenance' && (
-          <MaintenancePage monitors={monitors} />
+          <>
+            <div className="page-header">
+              <div>
+                <div className="page-header__title">Maintenance</div>
+                <div className="page-header__subtitle">
+                  {maintenanceMonitorIds.size > 0
+                    ? `${maintenanceMonitorIds.size} monitor${maintenanceMonitorIds.size !== 1 ? 's' : ''} in maintenance`
+                    : 'No active windows'}
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <MaintenancePage monitors={monitors} />
+            </div>
+          </>
         )}
 
         {!loading && !error && view === 'monitors' && (
           <>
-            {userMonitors.length > 0 && <SummaryBar monitors={userMonitors} />}
-
-            {/* ── Monitors ── */}
-            <section>
-              <div className="section-head flex items-center justify-between">
-                <span className="wt-eyebrow">Monitors</span>
-                {userMonitors.length > 0 && (
-                  <div className="flex items-center gap-0.5">
-                    <button
-                      onClick={() => setGroupByEnabled(p => { const n = !p; try { localStorage.setItem('nw-group-by', String(n)); } catch {} return n; })}
-                      className="wt-btn wt-btn--ghost wt-btn--sm"
-                      title="Group by"
-                      style={groupByEnabled ? { color: 'var(--wt-brand-500)', background: 'color-mix(in oklch, var(--wt-brand-500) 10%, transparent)' } : undefined}>
-                      <Layers size={14} />
-                    </button>
-                    <button
-                      onClick={() => setViewMode('grid')}
-                      className="wt-btn wt-btn--ghost wt-btn--sm"
-                      title="Card view"
-                      style={viewMode === 'grid' ? { color: 'var(--wt-brand-500)', background: 'color-mix(in oklch, var(--wt-brand-500) 10%, transparent)' } : undefined}>
-                      <LayoutGrid size={14} />
-                    </button>
-                    <button
-                      onClick={() => setViewMode('list')}
-                      className="wt-btn wt-btn--ghost wt-btn--sm"
-                      title="List view"
-                      style={viewMode === 'list' ? { color: 'var(--wt-brand-500)', background: 'color-mix(in oklch, var(--wt-brand-500) 10%, transparent)' } : undefined}>
-                      <List size={14} />
-                    </button>
-                  </div>
-                )}
+            {/* Page header */}
+            <div className="page-header">
+              <div>
+                <div className="page-header__title">Monitors</div>
+                <div className="page-header__subtitle">
+                  {userMonitors.length} monitor{userMonitors.length !== 1 ? 's' : ''}
+                </div>
               </div>
+              <div className="flex items-center gap-2">
+                <HistoryRangeControl historyRange={historyRange} onChange={setHistoryRange} t={t} isDark={isDark} />
+                <button onClick={refresh} className="wt-btn wt-btn--ghost wt-btn--sm" title="Refresh">
+                  <RefreshCw size={14} />
+                </button>
+              </div>
+            </div>
+
+            {/* Summary tiles */}
+            {userMonitors.length > 0 && (
+              <div className="px-6 pt-5 pb-2">
+                <SummaryBar monitors={userMonitors} />
+              </div>
+            )}
+
+            {/* Monitors toolbar */}
+            {userMonitors.length > 0 && (
+              <MonitorsToolbar
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                statusFilter={statusFilter}
+                onStatusFilter={setStatusFilter}
+                sortBy={sortBy}
+                onSortBy={setSortBy}
+                viewMode={viewMode}
+                onViewMode={setViewMode}
+                groupByEnabled={groupByEnabled}
+                onToggleGroupBy={() => setGroupByEnabled(p => {
+                  const n = !p;
+                  try { localStorage.setItem('nw-group-by', String(n)); } catch {}
+                  return n;
+                })}
+              />
+            )}
 
             {/* Monitor grid or list */}
-            {userMonitors.length === 0 ? (
-              <EmptyState onAdd={openAdd} t={t} />
-            ) : filteredMonitors.length === 0 ? (
-              <div className="py-12 text-center text-xs" style={{ color: t.textMuted }}>
-                No monitors match the selected filters
-              </div>
-            ) : viewMode === 'list' ? (
-              <MonitorListView
-                monitors={filteredMonitors}
-                groups={groupByEnabled ? groups : null}
-                onCardClick={mon => openDetail(mon, 'history')}
-                onEdit={mon => openDetail(mon, 'configure')}
-                t={t}
-              />
-            ) : groupByEnabled ? (
-              <GroupedMonitorView
-                monitors={filteredMonitors}
-                groups={groups}
-                maintenanceMonitorIds={maintenanceMonitorIds}
-                onEdit={mon => openDetail(mon, 'configure')}
-                onCardClick={mon => openDetail(mon, 'history')}
-                onIncidentClick={handleIncidentClick}
-                getWidth={getWidth}
-                chartYMax={chartYMax}
-                onMoveGroup={handleMoveGroup}
-              />
-            ) : (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}>
-                <SortableContext
-                  items={filteredMonitors.map(m => String(m.id))}
-                  strategy={rectSortingStrategy}>
+            <div className="px-6 py-5">
+              {userMonitors.length === 0 ? (
+                <EmptyState onAdd={openAdd} t={t} />
+              ) : filteredMonitors.length === 0 ? (
+                <div className="py-12 text-center text-xs" style={{ color: t.textMuted }}>
+                  No monitors match the selected filters
+                </div>
+              ) : viewMode === 'list' ? (
+                <MonitorListView
+                  monitors={filteredMonitors}
+                  groups={groupByEnabled ? groups : null}
+                  onCardClick={mon => openDetail(mon, 'history')}
+                  onEdit={mon => openDetail(mon, 'configure')}
+                  t={t}
+                />
+              ) : groupByEnabled ? (
+                <GroupedMonitorView
+                  monitors={filteredMonitors}
+                  groups={groups}
+                  maintenanceMonitorIds={maintenanceMonitorIds}
+                  onEdit={mon => openDetail(mon, 'configure')}
+                  onCardClick={mon => openDetail(mon, 'history')}
+                  onIncidentClick={handleIncidentClick}
+                  getWidth={getWidth}
+                  chartYMax={chartYMax}
+                  onMoveGroup={handleMoveGroup}
+                />
+              ) : (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}>
+                  <SortableContext
+                    items={filteredMonitors.map(m => String(m.id))}
+                    strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {filteredMonitors.map(m => (
+                        <SortableMonitorCard
+                          key={m.id}
+                          monitor={m}
+                          onEdit={mon => openDetail(mon, 'configure')}
+                          onCardClick={mon => openDetail(mon, 'history')}
+                          onIncidentClick={handleIncidentClick}
+                          width={getWidth(m.id)}
+                          sortEnabled={sortEnabled}
+                          chartYMax={chartYMax}
+                          inMaintenance={maintenanceMonitorIds.has(m.id)}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              )}
+
+              {/* Module instances */}
+              {instances.length > 0 && (
+                <section className="mt-6">
+                  <div className="section-head"><span className="wt-eyebrow">Modules</span></div>
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {filteredMonitors.map(m => (
-                      <SortableMonitorCard
-                        key={m.id}
-                        monitor={m}
-                        onEdit={mon => openDetail(mon, 'configure')}
-                        onCardClick={mon => openDetail(mon, 'history')}
-                        onIncidentClick={handleIncidentClick}
-                        width={getWidth(m.id)}
-                        sortEnabled={sortEnabled}
-                        chartYMax={chartYMax}
-                        inMaintenance={maintenanceMonitorIds.has(m.id)}
-                      />
+                    {instances.filter(i => i.enabled).map(inst => (
+                      <ModuleCard key={inst.id} instance={inst} onEdit={setEditingInstance} onDelete={deleteInstance} />
                     ))}
                   </div>
-                </SortableContext>
-              </DndContext>
-            )}
+                </section>
+              )}
 
-            </section>
-
-            {/* ── Module instances ── */}
-            {instances.length > 0 && (
-              <section className="mt-6">
-                <div className="section-head"><span className="wt-eyebrow">Modules</span></div>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {instances.filter(i => i.enabled).map(inst => (
-                    <ModuleCard key={inst.id} instance={inst} onEdit={setEditingInstance} onDelete={deleteInstance} />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* ── Network Reference ── */}
-            {refMonitors.length > 0 && (
-              <section className="mt-6">
-                <div className="section-head"><span className="wt-eyebrow">Reference</span></div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {refMonitors.map(m => <MonitorCard key={m.id} monitor={m} compact />)}
-                </div>
-              </section>
-            )}
+              {/* Network Reference */}
+              {refMonitors.length > 0 && (
+                <section className="mt-6">
+                  <div className="section-head"><span className="wt-eyebrow">Reference</span></div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {refMonitors.map(m => <MonitorCard key={m.id} monitor={m} compact />)}
+                  </div>
+                </section>
+              )}
+            </div>
           </>
         )}
       </main>
@@ -1029,6 +1006,54 @@ function MonitorSearch({ value, onChange }) {
           <X size={12} />
         </button>
       )}
+    </div>
+  );
+}
+
+function MonitorsToolbar({ searchQuery, onSearchChange, statusFilter, onStatusFilter, sortBy, onSortBy, viewMode, onViewMode, groupByEnabled, onToggleGroupBy }) {
+  const STATUS_FILTERS = [
+    { value: 'all',      label: 'All' },
+    { value: 'down',     label: 'Down' },
+    { value: 'degraded', label: 'Degraded' },
+    { value: 'up',       label: 'Up' },
+  ];
+  return (
+    <div className="monitors-toolbar">
+      <div className="monitors-toolbar__left">
+        <MonitorSearch value={searchQuery} onChange={onSearchChange} />
+        <div className="wt-seg">
+          {STATUS_FILTERS.map(({ value, label }) => (
+            <button key={value} aria-selected={statusFilter === value} onClick={() => onStatusFilter(value)}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="monitors-toolbar__right">
+        <div className="flex items-center gap-1.5">
+          <span className="wt-mono text-[11px] uppercase tracking-wide" style={{ color: 'var(--wt-text-faint)' }}>Sort</span>
+          <select className="wt-select" value={sortBy} onChange={e => onSortBy(e.target.value)} style={{ fontSize: 12 }}>
+            {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+        <div className="wt-seg">
+          <button aria-selected={viewMode === 'grid'} onClick={() => onViewMode('grid')} title="Card view">
+            <LayoutGrid size={13} />
+          </button>
+          <button aria-selected={viewMode === 'list'} onClick={() => onViewMode('list')} title="List view">
+            <List size={13} />
+          </button>
+        </div>
+        <div style={{ width: 1, height: 18, background: 'var(--wt-border)', margin: '0 2px' }} />
+        <button
+          onClick={onToggleGroupBy}
+          className="wt-btn wt-btn--ghost wt-btn--sm"
+          title="Group by"
+          style={groupByEnabled ? { color: 'var(--wt-brand-500)', background: 'color-mix(in oklch, var(--wt-brand-500) 10%, transparent)' } : undefined}>
+          <Layers size={13} />
+          <span className="wt-mono" style={{ fontSize: 11 }}>Group</span>
+        </button>
+      </div>
     </div>
   );
 }

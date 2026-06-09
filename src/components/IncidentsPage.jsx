@@ -59,17 +59,8 @@ export function IncidentsPage({ alerts, monitors, onOpenDetail }) {
 
   return (
     <div>
-      {/* Page header */}
-      <div className="section-head flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="wt-eyebrow">Incidents</span>
-          {activeCount > 0 && (
-            <span className="wt-mono text-[11px] font-semibold px-2 py-0.5 rounded-full"
-              style={{ backgroundColor: 'var(--wt-down-50)', color: 'var(--wt-down-700)' }}>
-              {activeCount} active
-            </span>
-          )}
-        </div>
+      {/* Filter toolbar */}
+      <div className="flex items-center justify-between pb-4">
         <div className="wt-seg">
           <button aria-selected={filter === 'all'}      onClick={() => setFilter('all')}>
             All <span className="wt-mono opacity-60 ml-0.5" style={{ fontSize: 10 }}>{allIncidents.length}</span>

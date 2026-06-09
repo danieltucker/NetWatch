@@ -278,29 +278,18 @@ export function MaintenancePage({ monitors }) {
 
   return (
     <div>
-      {/* Header */}
-      <div className="section-head flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="wt-eyebrow">Maintenance</span>
-          {events.filter(e => eventStatus(e) === 'active').length > 0 && (
-            <span className="wt-mono text-[11px] font-semibold px-2 py-0.5 rounded-full"
-              style={{ backgroundColor: MAINTENANCE_COLOR_BG, color: MAINTENANCE_COLOR }}>
-              {events.filter(e => eventStatus(e) === 'active').length} active
-            </span>
-          )}
+      {/* Filter toolbar */}
+      <div className="flex items-center justify-between pb-4">
+        <div className="wt-seg">
+          <button aria-selected={filter === 'all'}      onClick={() => setFilter('all')}>All</button>
+          <button aria-selected={filter === 'upcoming'} onClick={() => setFilter('upcoming')}>Upcoming</button>
+          <button aria-selected={filter === 'active'}   onClick={() => setFilter('active')}>Active</button>
+          <button aria-selected={filter === 'past'}     onClick={() => setFilter('past')}>Past</button>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="wt-seg">
-            <button aria-selected={filter === 'all'}      onClick={() => setFilter('all')}>All</button>
-            <button aria-selected={filter === 'upcoming'} onClick={() => setFilter('upcoming')}>Upcoming</button>
-            <button aria-selected={filter === 'active'}   onClick={() => setFilter('active')}>Active</button>
-            <button aria-selected={filter === 'past'}     onClick={() => setFilter('past')}>Past</button>
-          </div>
-          <button onClick={() => { setShowForm(true); setEditEvent(null); }}
-            className="wt-btn wt-btn--primary wt-btn--sm">
-            <Plus size={13} /> New event
-          </button>
-        </div>
+        <button onClick={() => { setShowForm(true); setEditEvent(null); }}
+          className="wt-btn wt-btn--primary wt-btn--sm">
+          <Plus size={13} /> New event
+        </button>
       </div>
 
       {/* Form */}
