@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Radio, Activity, AlertTriangle, Bell, Tag as TagIcon, Settings, Code, X, Menu, Search, Zap, Calendar, LayoutGrid, List, AlertCircle as IncidentIcon, Wrench, Layers, RefreshCw, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Radio, Activity, AlertTriangle, Bell, Tag as TagIcon, Settings, Code, X, Menu, Search, Zap, Calendar, LayoutGrid, List, AlertCircle as IncidentIcon, Wrench, Layers, RefreshCw, ChevronDown, ChevronRight, ArrowUp, ArrowDown, BarChart2 } from 'lucide-react';
 import {
   DndContext, closestCenter,
   KeyboardSensor, PointerSensor,
@@ -27,6 +27,7 @@ import { ModuleInstanceForm }  from './components/ModuleInstanceForm';
 import { AlertsBanner }        from './components/AlertsBanner';
 import { IncidentsPage }       from './components/IncidentsPage';
 import { MaintenancePage }     from './components/MaintenancePage';
+import { ReportsPage }         from './components/ReportsPage';
 import { SettingsPanel }       from './components/SettingsPanel';
 import { EmbedModal }          from './components/EmbedModal';
 import { MonitorDetailModal }  from './components/MonitorDetailModal';
@@ -378,7 +379,7 @@ export default function App() {
         <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em', color: 'var(--wt-text)' }}>
           Net<span style={{ color: 'var(--nw-ink)' }}>Watch</span>
         </span>
-        <span className="wt-chip wt-chip--plain">v6.12.1</span>
+        <span className="wt-chip wt-chip--plain">v6.13.1</span>
 
         <div className="flex items-center gap-2" style={{ marginLeft: 'auto' }}>
           {/* live / offline indicator */}
@@ -483,6 +484,11 @@ export default function App() {
             </span>
           )}
         </button>
+        <button className={`side__item ${view === 'reports' ? 'is-active' : ''}`}
+          onClick={() => { setView('reports'); setMobileMenuOpen(false); }}>
+          <BarChart2 size={12} style={{ flexShrink: 0 }} />
+          <span className="side__item__label">Reports</span>
+        </button>
 
         {allTags.length > 0 && (
           <>
@@ -509,15 +515,6 @@ export default function App() {
       {/* ── Main ── */}
       <main className="app__main">
 
-        {/* Alerts banner — persistent, self-hides when no alerts */}
-        <AlertsBanner
-          alerts={alerts}
-          onDismiss={dismissAlert}
-          onDismissAll={dismissAll}
-          expanded={alertsExpanded}
-          onToggle={() => setAlertsExpanded(p => !p)}
-        />
-
         {loading && <LoadingState t={t} />}
         {error   && <ErrorState  message={error} t={t} />}
 
@@ -532,6 +529,15 @@ export default function App() {
                     : 'All clear'}
                 </div>
               </div>
+            </div>
+            <div className="px-6 pt-5">
+              <AlertsBanner
+                alerts={alerts}
+                onDismiss={dismissAlert}
+                onDismissAll={dismissAll}
+                expanded={alertsExpanded}
+                onToggle={() => setAlertsExpanded(p => !p)}
+              />
             </div>
             <div className="px-6 py-5">
               <IncidentsPage
@@ -558,8 +564,31 @@ export default function App() {
                 </div>
               </div>
             </div>
+            <div className="px-6 pt-5">
+              <AlertsBanner
+                alerts={alerts}
+                onDismiss={dismissAlert}
+                onDismissAll={dismissAll}
+                expanded={alertsExpanded}
+                onToggle={() => setAlertsExpanded(p => !p)}
+              />
+            </div>
             <div className="px-6 py-5">
               <MaintenancePage monitors={monitors} />
+            </div>
+          </>
+        )}
+
+        {!loading && !error && view === 'reports' && (
+          <>
+            <div className="page-header">
+              <div>
+                <div className="page-header__title">Reports</div>
+                <div className="page-header__subtitle">Generate and export uptime reports</div>
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <ReportsPage />
             </div>
           </>
         )}
@@ -582,6 +611,15 @@ export default function App() {
                   <RefreshCw size={14} />
                 </button>
               </div>
+            </div>
+            <div className="px-6 pt-5">
+              <AlertsBanner
+                alerts={alerts}
+                onDismiss={dismissAlert}
+                onDismissAll={dismissAll}
+                expanded={alertsExpanded}
+                onToggle={() => setAlertsExpanded(p => !p)}
+              />
             </div>
 
             {/* Summary tiles */}
@@ -1074,17 +1112,17 @@ function HistoryRangeControl({ historyRange, onChange, t, isDark }) {
   const [pickerOpen,  setPickerOpen]  = useState(false);
   const [draftFrom,   setDraftFrom]   = useState('');
   const [draftTo,     setDraftTo]     = useState('');
-  const [pickerPos,   setPickerPos]   = useState({ top: 0, left: 0 });
+  const [pickerPos,   setPickerPos]   = useState({ top: 0, right: 0 });
   const wrapRef    = useRef(null);
   const calBtnRef  = useRef(null);
   const pickerRef  = useRef(null);
 
-  // Position picker below the calendar button using fixed coords to escape
-  // the sidebar's overflow:auto clipping context.
+  // Position picker below the calendar button, right-aligned to the button so
+  // it never overflows the right edge of the viewport.
   const openPicker = () => {
     if (calBtnRef.current) {
       const r = calBtnRef.current.getBoundingClientRect();
-      setPickerPos({ top: r.bottom + 6, left: r.left });
+      setPickerPos({ top: r.bottom + 6, right: window.innerWidth - r.right });
     }
     setPickerOpen(true);
   };
@@ -1155,7 +1193,7 @@ function HistoryRangeControl({ historyRange, onChange, t, isDark }) {
       {pickerOpen && createPortal(
         <div ref={pickerRef} className="rounded-lg border p-3 space-y-2"
           style={{
-            position: 'fixed', top: pickerPos.top, left: pickerPos.left,
+            position: 'fixed', top: pickerPos.top, right: pickerPos.right,
             zIndex: 9999, minWidth: 260,
             backgroundColor: t.cardBg, borderColor: t.cardBorder,
             boxShadow: isDark ? '0 16px 48px rgba(0,0,0,0.6)' : '0 16px 48px rgba(0,0,0,0.15)',

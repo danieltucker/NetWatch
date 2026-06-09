@@ -24,7 +24,23 @@ router.get('/', (_req, res) => {
   res.json(rows.map(rowToAlert));
 });
 
-// ── PUT /api/alerts/:id/dismiss ──────────────────────��────────────────────────
+// ── GET /api/alerts/history ──────────────────────────────────────────────────
+// Full incident history — includes dismissed alerts, no date limit.
+// Used by the Incidents view so dismissed alerts stay visible.
+
+router.get('/history', (req, res) => {
+  const limit  = Math.min(parseInt(req.query.limit  ?? '500', 10), 1000);
+  const offset = parseInt(req.query.offset ?? '0', 10);
+  const rows = db.prepare(`
+    SELECT a.*, m.label AS monitor_label, m.target AS monitor_target
+    FROM   alerts a JOIN monitors m ON a.monitor_id = m.id
+    ORDER  BY a.started_at DESC
+    LIMIT  ? OFFSET ?
+  `).all(limit, offset);
+  res.json(rows.map(rowToAlert));
+});
+
+// ── PUT /api/alerts/:id/dismiss ──────────────────────────────────────────────
 
 router.put('/:id/dismiss', (req, res) => {
   const { id } = req.params;

@@ -77,7 +77,7 @@ function AlertRow({ alert, onDismiss }) {
               <span>Last occurred {formatDateTime(alert.lastOccurredAt)}</span>
               <span style={{ color: 'var(--wt-up-600)' }}>
                 Recovered {formatDateTime(alert.resolvedAt)}
-                {duration && <> · was down {duration}</>}
+                {duration && <> · was {isDegraded ? 'degraded' : 'down'} {duration}</>}
               </span>
             </>
           )}

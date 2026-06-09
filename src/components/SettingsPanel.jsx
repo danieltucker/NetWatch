@@ -341,7 +341,7 @@ export function SettingsPanel({ onClose, onImportSuccess, chartYMax = 'auto', on
           {/* Version label — desktop only */}
           <div className="hidden sm:block px-5 py-5">
             <div className="text-xs wt-mono" style={{ color: t.textFaint }}>
-              NetWatch v6.12.1
+              NetWatch v6.13.1
             </div>
           </div>
         </aside>
@@ -2120,7 +2120,7 @@ function BackupTab({ t, onImportSuccess }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Import failed');
-      setImportResult(data.imported);
+      setImportResult(data);
       setPreview(null);
       onImportSuccess?.();
     } catch (err) {
@@ -2143,7 +2143,7 @@ function BackupTab({ t, onImportSuccess }) {
         </div>
         <div className="px-5 py-4 space-y-3" style={{ backgroundColor: t.cardBg }}>
           <p className="text-xs wt-mono leading-relaxed" style={{ color: t.textMuted }}>
-            Credentials (passwords, tokens) are excluded. Re-enter them after restoring.
+            Includes all monitors, groups, maintenance events, settings, and notification tokens. Keep this file private.
           </p>
           <button onClick={doExport} className="wt-btn wt-btn--primary">
             <Download size={13} /> Download config
@@ -2237,11 +2237,21 @@ function BackupTab({ t, onImportSuccess }) {
 
           {/* Success */}
           {importResult && (
-            <div className="flex items-center gap-2 text-xs wt-mono p-3 rounded-lg"
+            <div className="text-xs wt-mono p-3 rounded-lg space-y-1"
               style={{ backgroundColor: 'color-mix(in oklch, var(--wt-up-500) 7%, transparent)', color: 'var(--wt-up-600)' }}>
-              <CheckCircle size={13} />
-              Imported {importResult.monitors} monitors, {importResult.groups} groups,
-              {' '}{importResult.maintenance} maintenance events.
+              <div className="flex items-center gap-2">
+                <CheckCircle size={13} />
+                Imported {importResult.imported?.monitors ?? 0} monitors, {importResult.imported?.groups ?? 0} groups,
+                {' '}{importResult.imported?.maintenance ?? 0} maintenance events.
+              </div>
+              {((importResult.skipped?.monitors ?? 0) > 0 || (importResult.skipped?.maintenance ?? 0) > 0) && (
+                <div style={{ color: 'var(--wt-warn-600)', paddingLeft: 21 }}>
+                  Skipped {[
+                    (importResult.skipped.monitors ?? 0) > 0 && `${importResult.skipped.monitors} monitor${importResult.skipped.monitors !== 1 ? 's' : ''} (invalid or duplicate)`,
+                    (importResult.skipped.maintenance ?? 0) > 0 && `${importResult.skipped.maintenance} maintenance event${importResult.skipped.maintenance !== 1 ? 's' : ''} (invalid dates)`,
+                  ].filter(Boolean).join(', ')}.
+                </div>
+              )}
             </div>
           )}
 

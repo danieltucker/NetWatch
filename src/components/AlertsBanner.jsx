@@ -71,7 +71,7 @@ function AlertRow({ alert, onDismiss, t }) {
             ? <span style={{ color: accentColor }}>Ongoing · <LiveElapsed since={alert.startedAt} /></span>
             : <span style={{ color: 'var(--wt-up-600)' }}>
                 Recovered {formatDateTime(alert.resolvedAt)}
-                {duration && <> · was down {duration}</>}
+                {duration && <> · was {isDegraded ? 'degraded' : 'down'} {duration}</>}
               </span>
           }
         </div>

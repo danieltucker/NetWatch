@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Loader } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { formatTimestamp } from '../types/monitor';
 
@@ -21,13 +21,12 @@ function LiveElapsed({ since }) {
   return <span>{formatDuration(elapsed)}</span>;
 }
 
-// Map server alert records to the incident shape the table expects
 function alertsToIncidents(alerts) {
   return alerts.map(a => ({
     id:           a.id,
     monitorId:    a.monitorId,
     monitorLabel: a.monitorLabel,
-    type:         a.type,            // 'outage' | 'degraded'
+    type:         a.type,
     start:        a.startedAt,
     end:          a.resolvedAt ?? null,
     durationMs:   a.resolvedAt
@@ -40,11 +39,32 @@ function alertsToIncidents(alerts) {
   });
 }
 
-export function IncidentsPage({ alerts, monitors, onOpenDetail }) {
+// IncidentsPage fetches its own full history so dismissed alerts remain visible.
+// The `alerts` prop (live banner state) is only used for the active count badge.
+export function IncidentsPage({ alerts: liveAlerts, monitors, onOpenDetail }) {
   const { t } = useTheme();
-  const [filter, setFilter] = useState('all');
+  const [filter,    setFilter]    = useState('all');
+  const [history,   setHistory]   = useState(null);
+  const [loadError, setLoadError] = useState('');
 
-  const allIncidents = useMemo(() => alertsToIncidents(alerts), [alerts]);
+  useEffect(() => {
+    fetch('/api/alerts/history?limit=500')
+      .then(r => r.json())
+      .then(data => setHistory(Array.isArray(data) ? data : []))
+      .catch(() => setLoadError('Failed to load incident history'));
+  }, []);
+
+  // Refresh history when a live alert resolves or is dismissed
+  const liveKey = liveAlerts.map(a => `${a.id}:${a.resolvedAt ?? ''}:${a.dismissedAt ?? ''}`).join(',');
+  useEffect(() => {
+    if (history === null) return;
+    fetch('/api/alerts/history?limit=500')
+      .then(r => r.json())
+      .then(data => setHistory(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [liveKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const allIncidents = useMemo(() => history ? alertsToIncidents(history) : [], [history]);
 
   const filtered = useMemo(() => allIncidents.filter(inc => {
     if (filter === 'active')   return inc.ongoing;
@@ -56,6 +76,15 @@ export function IncidentsPage({ alerts, monitors, onOpenDetail }) {
   const resolvedCount = allIncidents.filter(i => !i.ongoing).length;
 
   const findMonitor = (id) => monitors.find(m => m.id === id);
+
+  if (history === null && !loadError) {
+    return (
+      <div className="flex items-center justify-center py-24 gap-2 text-sm wt-mono"
+        style={{ color: 'var(--wt-text-faint)' }}>
+        <Loader size={14} className="animate-spin" /> Loading…
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -70,16 +99,20 @@ export function IncidentsPage({ alerts, monitors, onOpenDetail }) {
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {loadError ? (
+        <div className="py-12 text-center text-sm wt-mono" style={{ color: 'var(--wt-down-600)' }}>
+          {loadError}
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
           <CheckCircle size={36} style={{ color: 'var(--wt-up-500)', opacity: 0.4 }} />
           <p className="text-sm font-medium" style={{ color: t.textMuted }}>
             {filter === 'active'   ? 'No active incidents' :
              filter === 'resolved' ? 'No resolved incidents' :
-             'No incidents in this window'}
+             'No incidents on record'}
           </p>
           <p className="text-xs" style={{ color: t.textFaint }}>
-            {filter === 'all' ? 'All monitors have been healthy during this period' : ''}
+            {filter === 'all' ? 'All monitors have been healthy' : ''}
           </p>
         </div>
       ) : (
@@ -87,18 +120,10 @@ export function IncidentsPage({ alerts, monitors, onOpenDetail }) {
           <table className="w-full">
             <thead>
               <tr className="border-b" style={{ borderColor: 'var(--wt-border)' }}>
-                <th className="px-4 py-2.5 text-left">
-                  <span className="wt-eyebrow">Monitor</span>
-                </th>
-                <th className="px-4 py-2.5 text-left">
-                  <span className="wt-eyebrow">Status</span>
-                </th>
-                <th className="px-4 py-2.5 text-left">
-                  <span className="wt-eyebrow">Started</span>
-                </th>
-                <th className="px-4 py-2.5 text-left">
-                  <span className="wt-eyebrow">Duration</span>
-                </th>
+                <th className="px-4 py-2.5 text-left"><span className="wt-eyebrow">Monitor</span></th>
+                <th className="px-4 py-2.5 text-left"><span className="wt-eyebrow">Status</span></th>
+                <th className="px-4 py-2.5 text-left"><span className="wt-eyebrow">Started</span></th>
+                <th className="px-4 py-2.5 text-left"><span className="wt-eyebrow">Duration</span></th>
               </tr>
             </thead>
             <tbody>
@@ -112,38 +137,30 @@ export function IncidentsPage({ alerts, monitors, onOpenDetail }) {
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = ''}
                     onClick={() => monitor && onOpenDetail(monitor, 'incidents', inc.start)}>
 
-                    {/* Monitor name */}
                     <td className="px-4 py-3">
                       <span className="text-sm font-medium" style={{ color: t.textPrimary }}>
                         {inc.monitorLabel}
                       </span>
                     </td>
 
-                    {/* Status pill */}
                     <td className="px-4 py-3">
                       {inc.ongoing ? (
                         inc.type === 'degraded' ? (
-                          <span className="wt-pill wt-pill--warn">
-                            <span className="wt-pill__dot" />Degraded
-                          </span>
+                          <span className="wt-pill wt-pill--warn"><span className="wt-pill__dot" />Degraded</span>
                         ) : (
-                          <span className="wt-pill wt-pill--down">
-                            <span className="wt-pill__dot" />Down
-                          </span>
+                          <span className="wt-pill wt-pill--down"><span className="wt-pill__dot" />Down</span>
                         )
                       ) : (
                         <span className="wt-pill wt-pill--muted">Resolved</span>
                       )}
                     </td>
 
-                    {/* Start time */}
                     <td className="px-4 py-3">
                       <span className="wt-mono text-xs" style={{ color: t.textMuted }}>
                         {formatTimestamp(inc.start)}
                       </span>
                     </td>
 
-                    {/* Duration */}
                     <td className="px-4 py-3">
                       <span className="wt-mono text-xs"
                         style={{ color: inc.ongoing ? (inc.type === 'degraded' ? 'var(--wt-warn-600)' : 'var(--wt-down-600)') : t.textFaint }}>
@@ -161,16 +178,11 @@ export function IncidentsPage({ alerts, monitors, onOpenDetail }) {
         </div>
       )}
 
-      {/* Footer count */}
       {filtered.length > 0 && (
         <div className="mt-3 text-xs wt-mono" style={{ color: t.textFaint }}>
           {filtered.length} incident{filtered.length !== 1 ? 's' : ''}
-          {activeCount > 0 && filter !== 'resolved'
-            ? ` · ${activeCount} active`
-            : ''}
-          {resolvedCount > 0 && filter !== 'active'
-            ? ` · ${resolvedCount} resolved`
-            : ''}
+          {activeCount > 0 && filter !== 'resolved' ? ` · ${activeCount} active` : ''}
+          {resolvedCount > 0 && filter !== 'active'  ? ` · ${resolvedCount} resolved` : ''}
         </div>
       )}
     </div>
