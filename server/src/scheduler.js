@@ -266,7 +266,11 @@ export function scheduleMonitor(id) {
     const row = db.prepare('SELECT * FROM monitors WHERE id = ?').get(id);
     if (!row) { timers.delete(id); return; }
     const monitor = rowToMonitor(row);
-    await executeCheck(monitor);
+    try {
+      await executeCheck(monitor);
+    } catch (err) {
+      console.error(`[scheduler] check threw for "${monitor.label}" (${monitor.id}):`, err);
+    }
     if (!timers.has(id)) return; // was stopped during the check
     timers.set(id, setTimeout(tick, computeEffectiveInterval(monitor) * 1000));
   }

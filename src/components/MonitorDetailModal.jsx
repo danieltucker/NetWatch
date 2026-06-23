@@ -126,13 +126,13 @@ function ModalTooltip({ active, payload, t }) {
 // History tab
 // ---------------------------------------------------------------------------
 
-function HistoryTab({ history, t, isDark }) {
+function HistoryTab({ history, lastChecked, t, isDark }) {
   const [expandedIdx, setExpandedIdx] = useState(null);
 
   if (history.length === 0) {
     return (
       <div className="flex items-center justify-center py-16 text-xs wt-mono" style={{ color: t.textFaint }}>
-        No history yet — awaiting first check
+        {lastChecked ? 'No data in this window — try a wider range' : 'No history yet — awaiting first check'}
       </div>
     );
   }
@@ -227,7 +227,7 @@ function HistoryTab({ history, t, isDark }) {
 // Incidents tab
 // ---------------------------------------------------------------------------
 
-function IncidentsTab({ history, t, isDark, initialIncidentTimestamp }) {
+function IncidentsTab({ history, lastChecked, t, isDark, initialIncidentTimestamp }) {
   const incidents = useMemo(() => computeIncidents(history), [history]);
   const [expandedIdx, setExpandedIdx] = useState(null);
 
@@ -244,7 +244,9 @@ function IncidentsTab({ history, t, isDark, initialIncidentTimestamp }) {
   }, [initialIncidentTimestamp, incidents]);
 
   if (history.length === 0) {
-    return <div className="flex items-center justify-center py-16 text-xs wt-mono" style={{ color: t.textFaint }}>No history yet — awaiting first check</div>;
+    return <div className="flex items-center justify-center py-16 text-xs wt-mono" style={{ color: t.textFaint }}>
+      {lastChecked ? 'No data in this window — try a wider range' : 'No history yet — awaiting first check'}
+    </div>;
   }
   if (incidents.length === 0) {
     return (
@@ -654,7 +656,7 @@ export function MonitorDetailModal({
               </div>
             ) : (
               <div className="flex items-center justify-center h-24 text-xs wt-mono" style={{ color: t.textFaint }}>
-                awaiting first check…
+                {monitor.lastChecked ? 'no data in this window' : 'awaiting first check…'}
               </div>
             )}
           </div>
@@ -711,8 +713,8 @@ export function MonitorDetailModal({
 
         {/* ── Tab content — natural flow ── */}
         <div>
-          {activeTab === 'history'   && <HistoryTab   history={history} t={t} isDark={isDark} />}
-          {activeTab === 'incidents' && <IncidentsTab history={history} t={t} isDark={isDark} initialIncidentTimestamp={initialIncidentTimestamp} />}
+          {activeTab === 'history'   && <HistoryTab   history={history} lastChecked={monitor.lastChecked} t={t} isDark={isDark} />}
+          {activeTab === 'incidents' && <IncidentsTab history={history} lastChecked={monitor.lastChecked} t={t} isDark={isDark} initialIncidentTimestamp={initialIncidentTimestamp} />}
           {activeTab === 'embed'     && <EmbedTab monitor={monitor} t={t} />}
           {activeTab === 'configure' && (
             <div className="flex flex-col">

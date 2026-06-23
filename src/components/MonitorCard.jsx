@@ -418,7 +418,9 @@ function MonitorCardInner({
             </ResponsiveContainer>
           </div>
         ) : (
-          <div className="flex items-center justify-center h-16 text-xs" style={{ color: t.textFaint }}>awaiting first check…</div>
+          <div className="flex items-center justify-center h-16 text-xs" style={{ color: t.textFaint }}>
+            {monitor.lastChecked ? 'no data in this window' : 'awaiting first check…'}
+          </div>
         )}
       </div>
 
