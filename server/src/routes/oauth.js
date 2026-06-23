@@ -127,13 +127,23 @@ router.post('/microsoft/disconnect', (_req, res) => {
 // ── Callback HTML page ────────────────────────────────────────────────────────
 // Sends a postMessage to the opener and auto-closes after 1.5 s.
 
+function escHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function callbackPage(email, error) {
-  const message = error
-    ? JSON.stringify({ type: 'ms-oauth-error',   error })
-    : JSON.stringify({ type: 'ms-oauth-success', email: email || '' });
+  // JSON embedded directly inside a <script> block must not contain </script>.
+  // Replace angle brackets with their Unicode escapes — valid JS, safe HTML.
+  const message = JSON.stringify(
+    error
+      ? { type: 'ms-oauth-error',   error }
+      : { type: 'ms-oauth-success', email: email || '' }
+  ).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
 
   const heading = error ? 'Connection failed'     : 'Connected successfully';
-  const detail  = error ? String(error)           : 'You may close this window.';
+  const detail  = error ? escHtml(String(error))  : 'You may close this window.';
   const color   = error ? '#ef4444'               : '#22c55e';
 
   return `<!DOCTYPE html>

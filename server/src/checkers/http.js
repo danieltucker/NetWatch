@@ -50,6 +50,13 @@ export async function httpCheck(target) {
       followRedirect:  true,
       throwHttpErrors: false,
       headers:         { 'User-Agent': 'WatchTower/4.5' },
+      hooks: {
+        beforeRedirect: [
+          async (options) => {
+            await assertNotSsrfTarget(options.url.hostname);
+          },
+        ],
+      },
     });
   } catch (err) {
     return { status: 'down', error: err.message };

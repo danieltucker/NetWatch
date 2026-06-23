@@ -32,9 +32,35 @@ const STRIP_SETTINGS = new Set([
   'report_last_sent',
 ]);
 
+// Secret keys masked as '***' in GET /api/settings — same treatment on export
+// so credentials are never exposed to anyone who can reach the HTTP port.
+const MASKED_SETTINGS = new Set([
+  'telegram_token', 'email_smtp_pass', 'twilio_auth_token',
+  'twilio_account_sid', 'webhook_url',
+  'email_oauth_client_secret',
+]);
+
+function isModuleSecretKey(key) {
+  const field = key.split('.').slice(2).join('.');
+  return field.endsWith('_token') || field.endsWith('_key') || field.endsWith('_secret');
+}
+
 // Valid values for enum-like fields
 const VALID_CHECK_TYPES  = new Set(['http', 'api', 'tcp', 'icmp']);
 const VALID_RECURRENCES  = new Set(['daily', 'weekly', 'monthly']);
+
+// Allowlist for importable settings keys — mirrors KNOWN_KEYS in routes/settings.js
+const IMPORTABLE_SETTINGS_KEYS = new Set([
+  'telegram_enabled', 'telegram_token', 'telegram_chat_id',
+  'email_enabled', 'email_smtp_host', 'email_smtp_port',
+  'email_smtp_user', 'email_smtp_pass', 'email_from', 'email_to',
+  'email_auth_type', 'email_oauth_client_id', 'email_oauth_client_secret',
+  'twilio_enabled', 'twilio_account_sid', 'twilio_auth_token',
+  'twilio_from', 'twilio_to',
+  'webhook_enabled', 'webhook_url',
+  'report_enabled', 'report_interval', 'report_time', 'report_tag_filter',
+  'network_refs_enabled', 'network_refs_custom',
+]);
 
 function isIso(str) {
   return typeof str === 'string' && !isNaN(Date.parse(str));
@@ -70,7 +96,9 @@ router.get('/export', (_req, res) => {
   const allSettings = getAllSettings();
   const settings = {};
   for (const [k, v] of Object.entries(allSettings)) {
-    if (!STRIP_SETTINGS.has(k)) settings[k] = v;
+    if (STRIP_SETTINGS.has(k)) continue;
+    const isMasked = MASKED_SETTINGS.has(k) || (k.startsWith('module.') && isModuleSecretKey(k));
+    settings[k] = (isMasked && v) ? '***' : v;
   }
 
   res.setHeader(
@@ -235,13 +263,14 @@ router.post('/import', (req, res) => {
       importedMaintenance++;
     }
 
-    // settings — skip OAuth session tokens and masked/null values
+    // settings — accept only known keys (prevents arbitrary key injection)
     for (const [k, v] of Object.entries(settings)) {
+      if (typeof k !== 'string' || !k.trim()) continue;
       if (STRIP_SETTINGS.has(k)) continue;
       if (v === null || v === undefined || v === '***') continue;
-      if (typeof k !== 'string' || !k.trim()) continue;
-      // Only accept string, number, or boolean values
       if (!['string', 'number', 'boolean'].includes(typeof v)) continue;
+      // Only write keys in the allowlist or module.* dynamic keys
+      if (!IMPORTABLE_SETTINGS_KEYS.has(k) && !k.startsWith('module.')) continue;
       setSetting(k, v);
     }
   })();

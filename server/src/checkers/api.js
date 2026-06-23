@@ -80,6 +80,13 @@ export async function apiCheck(monitor) {
       throwHttpErrors: false,
       maxResponseSize: BODY_SIZE_LIMIT,
       headers,
+      hooks: {
+        beforeRedirect: [
+          async (options) => {
+            await assertNotSsrfTarget(options.url.hostname);
+          },
+        ],
+      },
     });
   } catch (err) {
     if (err.code === 'ERR_BODY_OVERFLOW' && err.response) {

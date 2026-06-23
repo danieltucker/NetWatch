@@ -221,6 +221,11 @@ export async function sendWebhookAlert(monitor, event, overrides = {}) {
       timestamp: new Date().toISOString(),
     },
     timeout: { request: 10_000 },
+    hooks: {
+      beforeRedirect: [
+        async (options) => { await assertNotSsrfTarget(options.url.hostname); },
+      ],
+    },
   });
 }
 

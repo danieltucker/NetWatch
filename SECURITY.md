@@ -49,19 +49,23 @@ HTTP and API checkers, plus the webhook alerter, resolve the target hostname via
 
 - Loopback (`127.0.0.0/8`, `::1`)
 - RFC-1918 private ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`)
+- RFC-6598 carrier-grade NAT (`100.64.0.0/10`)
 - Link-local (`169.254.0.0/16`, `fe80::/10`)
 - Unique-local IPv6 (`fc00::/7`)
+- IPv4-mapped IPv6 (`::ffff:x.x.x.x` — the embedded IPv4 is checked against all private ranges)
+
+The guard also runs on every HTTP redirect hop (via a `beforeRedirect` hook) so a monitored URL that redirects to a private IP cannot bypass the guard.
 
 **ICMP and TCP checks bypass this guard by design.** Both return only latency and up/down status — no response body can be exfiltrated. This allows monitoring internal hosts (routers, NAS, etc.), which is a core homelab use-case.
 
 ### Credential Masking
 
-Secret fields are returned as `"***"` in all API responses. Sending `"***"` back in a PUT request is treated as "no change" so credentials are never round-tripped through the browser. Affected fields: `telegram_token`, `email_smtp_pass`, `twilio_auth_token`, `twilio_account_sid`, `webhook_url`, monitor `authPass` and `authToken`, and any module field whose key ends in `_token`, `_key`, or `_secret`.
+Secret fields are returned as `"***"` in all API responses **and in the config export**. Sending `"***"` back in a PUT request is treated as "no change" so credentials are never round-tripped through the browser. Affected fields: `telegram_token`, `email_smtp_pass`, `twilio_auth_token`, `twilio_account_sid`, `webhook_url`, `email_oauth_client_secret`, monitor `authPass` and `authToken`, and any module field whose key ends in `_token`, `_key`, or `_secret`.
 
 ### Input Validation
 
 - `checkType` is validated against `http | tcp | icmp | api` on create and update
-- `interval` must be an integer ≥ 30 seconds on create and update
+- `interval` must be an integer ≥ 15 seconds on create and update
 - Monitor labels and targets are HTML-escaped before interpolation into email alert bodies
 - Error strings stored in the database are capped at 256 characters
 
