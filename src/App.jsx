@@ -379,7 +379,7 @@ export default function App() {
         <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em', color: 'var(--wt-text)' }}>
           Net<span style={{ color: 'var(--nw-ink)' }}>Watch</span>
         </span>
-        <span className="wt-chip wt-chip--plain">v6.13.1</span>
+        <a href="https://github.com/danieltucker/NetWatch/releases/tag/v6.15.0" target="_blank" rel="noopener noreferrer" className="wt-chip wt-chip--plain" style={{ textDecoration: 'none' }}>v6.15.0</a>
 
         <div className="flex items-center gap-2" style={{ marginLeft: 'auto' }}>
           {/* live / offline indicator */}
