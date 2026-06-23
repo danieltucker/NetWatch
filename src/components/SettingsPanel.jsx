@@ -342,7 +342,7 @@ export function SettingsPanel({ onClose, onImportSuccess, chartYMax = 'auto', on
           {/* Version label — desktop only */}
           <div className="hidden sm:block px-5 py-5">
             <div className="text-xs wt-mono" style={{ color: t.textFaint }}>
-              <a href="https://github.com/danieltucker/NetWatch/releases/tag/v6.15.0" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>NetWatch v6.15.0</a>
+              <a href="https://github.com/danieltucker/NetWatch/releases/tag/v6.15.1" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>NetWatch v6.15.1</a>
             </div>
           </div>
         </aside>
