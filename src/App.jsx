@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Radio, Activity, AlertTriangle, Bell, Tag as TagIcon, Settings, Code, X, Menu, Search, Zap, Calendar, LayoutGrid, List, AlertCircle as IncidentIcon, Wrench, Layers, RefreshCw, ChevronDown, ChevronRight, ArrowUp, ArrowDown, BarChart2 } from 'lucide-react';
+import { Plus, Radio, Activity, AlertTriangle, Bell, Tag as TagIcon, Settings, Code, X, Menu, Search, Zap, Calendar, LayoutGrid, List, AlertCircle as IncidentIcon, Wrench, Layers, RefreshCw, ChevronDown, ChevronRight, ArrowUp, ArrowDown, BarChart2, LogOut } from 'lucide-react';
+import { useAuth } from './hooks/useAuth';
 import {
   DndContext, closestCenter,
   KeyboardSensor, PointerSensor,
@@ -85,6 +86,7 @@ const SORT_OPTIONS = [
 
 export default function App() {
   const { isDark, t } = useTheme();
+  const { user, logout } = useAuth();
 
   // One-time migration: move wt- prefixed keys to nw- on first load
   useEffect(() => {
@@ -379,7 +381,7 @@ export default function App() {
         <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em', color: 'var(--wt-text)' }}>
           Net<span style={{ color: 'var(--nw-ink)' }}>Watch</span>
         </span>
-        <a href="https://github.com/danieltucker/NetWatch/releases/tag/v6.15.1" target="_blank" rel="noopener noreferrer" className="wt-chip wt-chip--plain" style={{ textDecoration: 'none' }}>v6.15.1</a>
+        <a href="https://github.com/danieltucker/NetWatch/releases/tag/v6.16.0" target="_blank" rel="noopener noreferrer" className="wt-chip wt-chip--plain" style={{ textDecoration: 'none' }}>v6.16.0</a>
 
         <div className="flex items-center gap-2" style={{ marginLeft: 'auto' }}>
           {/* live / offline indicator */}
@@ -421,6 +423,7 @@ export default function App() {
             </button>
             <button onClick={() => setEmbedMonitor(undefined)} className="wt-btn wt-btn--ghost wt-btn--sm" title="Embed dashboard"><Code size={16} /></button>
             <button onClick={() => setShowSettings(true)} className="wt-btn wt-btn--ghost wt-btn--sm" title="Settings"><Settings size={16} /></button>
+            <button onClick={logout} className="wt-btn wt-btn--ghost wt-btn--sm" title={`Sign out (${user?.username})`}><LogOut size={16} /></button>
           </div>
 
           <button onClick={openAdd} className="hidden wide:inline-flex wt-btn wt-btn--primary"><Plus size={15} />Add monitor</button>
@@ -454,6 +457,7 @@ export default function App() {
           <button onClick={() => { openAdd(); setMobileMenuOpen(false); }} className="wt-btn wt-btn--primary wt-btn--sm"><Plus size={14} />Add</button>
           <button onClick={() => { setEmbedMonitor(undefined); setMobileMenuOpen(false); }} className="wt-btn wt-btn--ghost wt-btn--sm" title="Embed"><Code size={14} /></button>
           <button onClick={() => { setShowSettings(true); setMobileMenuOpen(false); }} className="wt-btn wt-btn--ghost wt-btn--sm" title="Settings"><Settings size={14} /></button>
+          <button onClick={logout} className="wt-btn wt-btn--ghost wt-btn--sm" title="Sign out"><LogOut size={14} /></button>
         </div>
 
         {/* VIEWS */}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronLeft, Send, CheckCircle, AlertCircle, Loader, Bell, Settings2, SlidersHorizontal, Puzzle, ExternalLink, FileBarChart2, Plus, Wifi, Globe, Terminal, Key, Copy, RefreshCw, Trash2, Layers, Edit2, Check, Download, Upload, Database } from 'lucide-react';
+import { X, ChevronLeft, Send, CheckCircle, AlertCircle, Loader, Bell, Settings2, SlidersHorizontal, Puzzle, ExternalLink, FileBarChart2, Plus, Wifi, Globe, Terminal, Key, Copy, RefreshCw, Trash2, Layers, Edit2, Check, Download, Upload, Database, UserCircle } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
+import { useAuth } from '../hooks/useAuth';
 import { moduleRegistry } from '../modules/index.js';
 import { NETWORK_REF_PRESETS, DEFAULT_NETWORK_REFS_ENABLED } from '../types/networkRefs.js';
 
@@ -26,6 +27,7 @@ const TABS = [
   { id: 'modules',       label: 'Modules',        Icon: Puzzle         },
   { id: 'api-keys',      label: 'API Keys',       Icon: Key            },
   { id: 'backup',        label: 'Backup',         Icon: Database       },
+  { id: 'account',       label: 'Account',        Icon: UserCircle     },
 ];
 
 // Required fields per channel — used for pre-save validation.
@@ -49,6 +51,7 @@ const CHANNEL_VALIDATION = [
 
 export function SettingsPanel({ onClose, onImportSuccess, chartYMax = 'auto', onChartYMaxChange, alertsAutoOpen = 'outage', onAlertsAutoOpenChange }) {
   const { t, isDark, themeMode, setThemeMode } = useTheme();
+  const { user, changePassword } = useAuth();
   const [activeTab,        setActiveTab]        = useState('general');
   const [mobileContentOpen, setMobileContentOpen] = useState(false);
   const [settings,      setSettings]      = useState(DEFAULT_SETTINGS);
@@ -259,6 +262,7 @@ export function SettingsPanel({ onClose, onImportSuccess, chartYMax = 'auto', on
     activeTab === 'groups'        ? 'Organise monitors into named groups'       :
     activeTab === 'api-keys'      ? 'Manage API keys for external integrations' :
     activeTab === 'backup'        ? 'Export and import your full configuration'  :
+    activeTab === 'account'       ? 'Manage your account and password'           :
                                     'Install modules and manage credentials';
 
   return (
@@ -446,6 +450,9 @@ export function SettingsPanel({ onClose, onImportSuccess, chartYMax = 'auto', on
             )}
             {activeTab === 'backup' && (
               <BackupTab t={t} onImportSuccess={onImportSuccess} />
+            )}
+            {activeTab === 'account' && (
+              <AccountTab user={user} changePassword={changePassword} t={t} />
             )}
             {activeTab === 'notifications' && (
               <NotificationsTab
@@ -2324,6 +2331,114 @@ function PresetSection({ title, presets, enabled, onToggle, t }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ── Account tab ───────────────────────────────────────────────────────────────
+
+function AccountTab({ user, changePassword, t }) {
+  const [current,   setCurrent]   = useState('');
+  const [next,      setNext]      = useState('');
+  const [confirm,   setConfirm]   = useState('');
+  const [saving,    setSaving]    = useState(false);
+  const [saved,     setSaved]     = useState(false);
+  const [error,     setError]     = useState('');
+
+  const mismatch  = confirm && next !== confirm;
+  const tooShort  = next && next.length < 12;
+  const canSubmit = current && next.length >= 12 && next === confirm && !saving;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setError('');
+    setSaving(true);
+    try {
+      await changePassword(current, next);
+      setSaved(true);
+      setCurrent(''); setNext(''); setConfirm('');
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Current user */}
+      <div className="px-1">
+        <span className="wt-eyebrow" style={{ display: 'block', marginBottom: 10 }}>Signed in as</span>
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl border"
+          style={{ borderColor: t.cardBorder, backgroundColor: 'var(--wt-surface-2)' }}>
+          <UserCircle size={18} style={{ color: 'var(--wt-text-muted)' }} />
+          <span className="wt-mono text-sm font-medium" style={{ color: t.textPrimary }}>
+            {user?.username ?? 'admin'}
+          </span>
+          <span className="wt-pill wt-pill--muted" style={{ marginLeft: 'auto', fontSize: 10 }}>
+            {user?.role ?? 'admin'}
+          </span>
+        </div>
+      </div>
+
+      {/* Change password */}
+      <div className="px-1">
+        <span className="wt-eyebrow" style={{ display: 'block', marginBottom: 10 }}>Change password</span>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="wt-field">
+            <label className="wt-label">Current password</label>
+            <input className="wt-input" type="password" autoComplete="current-password"
+              value={current} onChange={e => setCurrent(e.target.value)} disabled={saving} />
+          </div>
+
+          <div className="wt-field">
+            <label className="wt-label">New password</label>
+            <input className="wt-input" type="password" autoComplete="new-password"
+              value={next} onChange={e => setNext(e.target.value)} disabled={saving} />
+            {tooShort && (
+              <span className="wt-hint" style={{ color: 'var(--wt-warn-600)' }}>
+                Must be at least 12 characters
+              </span>
+            )}
+          </div>
+
+          <div className="wt-field">
+            <label className="wt-label">Confirm new password</label>
+            <input className="wt-input" type="password" autoComplete="new-password"
+              value={confirm} onChange={e => setConfirm(e.target.value)} disabled={saving} />
+            {mismatch && (
+              <span className="wt-hint" style={{ color: 'var(--wt-down-600)' }}>Passwords do not match</span>
+            )}
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 text-xs wt-mono"
+              style={{ color: 'var(--wt-down-600)', padding: '8px 10px',
+                backgroundColor: 'var(--wt-down-50)', borderRadius: 'var(--wt-r-md)',
+                border: '1px solid color-mix(in oklch, var(--wt-down-500) 25%, transparent)' }}>
+              <AlertCircle size={12} style={{ flexShrink: 0 }} />
+              {error}
+            </div>
+          )}
+
+          {saved && (
+            <div className="flex items-center gap-2 text-xs wt-mono"
+              style={{ color: 'var(--wt-up-600)', padding: '8px 10px',
+                backgroundColor: 'var(--wt-up-50)', borderRadius: 'var(--wt-r-md)',
+                border: '1px solid color-mix(in oklch, var(--wt-up-500) 25%, transparent)' }}>
+              <CheckCircle size={12} style={{ flexShrink: 0 }} />
+              Password updated successfully
+            </div>
+          )}
+
+          <button type="submit" className="wt-btn wt-btn--primary wt-btn--sm"
+            disabled={!canSubmit} style={{ alignSelf: 'flex-start' }}>
+            {saving ? 'Updating…' : 'Update password'}
+          </button>
+        </form>
       </div>
     </div>
   );

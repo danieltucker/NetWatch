@@ -14,14 +14,14 @@ export function EmbedView({ monitorId }) {
   const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
-    fetch('/api/monitors?window=1h')
+    fetch('/api/public/monitors?window=1h')
       .then(r => r.json())
       .then(data => { setMonitors(data); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    const es = new EventSource('/api/events');
+    const es = new EventSource('/api/public/events');
     es.addEventListener('monitor:checked', (e) => {
       const u = JSON.parse(e.data);
       setMonitors(prev => prev.map(m => {

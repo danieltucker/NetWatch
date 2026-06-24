@@ -135,7 +135,26 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_saved_reports_generated
     ON saved_reports (generated_at DESC);
+
+  CREATE TABLE IF NOT EXISTS sessions (
+    sid        TEXT    PRIMARY KEY,
+    data       TEXT    NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS users (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    username      TEXT    NOT NULL UNIQUE,
+    email         TEXT,
+    password_hash TEXT,
+    role          TEXT    NOT NULL DEFAULT 'admin',
+    created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+    last_login    TEXT
+  );
 `);
+
+// ── Seed admin user ───────────────────────────────────────────────────────────
+db.prepare(`INSERT OR IGNORE INTO users (username, role) VALUES ('admin', 'admin')`).run();
 
 // ── Migrations for existing databases ─────────────────────────────────────────
 for (const sql of [
@@ -236,6 +255,28 @@ export function rowToMaintenanceEvent(row) {
     createdAt:      row.created_at,
     monitorIds:     row.monitor_ids ? JSON.parse(row.monitor_ids) : [],
   };
+}
+
+// ── User helpers ──────────────────────────────────────────────────────────────
+
+export function getUserByUsername(username) {
+  return db.prepare(
+    'SELECT id, username, email, password_hash, role, created_at, last_login FROM users WHERE username = ?'
+  ).get(username);
+}
+
+export function getUserById(id) {
+  return db.prepare(
+    'SELECT id, username, email, role, created_at, last_login FROM users WHERE id = ?'
+  ).get(id);
+}
+
+export function setPasswordHash(userId, hash) {
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, userId);
+}
+
+export function updateLastLogin(userId) {
+  db.prepare("UPDATE users SET last_login = datetime('now') WHERE id = ?").run(userId);
 }
 
 // ── Settings helpers ──────────────────────────────────────────────────────────

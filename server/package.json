@@ -1,6 +1,6 @@
 {
   "name": "netwatch-server",
-  "version": "6.15.1",
+  "version": "6.16.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,8 +8,10 @@
     "dev": "node --watch src/server.js"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.8.0",
     "express": "^4.22.2",
+    "express-session": "^1.19.0",
     "got": "^13.0.0",
     "nodemailer": "^9.0.1",
     "ssl-checker": "^2.0.10"
