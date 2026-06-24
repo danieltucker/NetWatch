@@ -41,7 +41,7 @@ export function LoginPage() {
         </div>
 
         {/* Card */}
-        <div className="wt-card" style={{ '--pad': '28px' }}>
+        <div className="wt-card" style={{ padding: 28 }}>
           <span className="wt-eyebrow" style={{ display: 'block', marginBottom: 20 }}>Sign in</span>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

@@ -43,7 +43,7 @@ export function SetupPage() {
           </span>
         </div>
 
-        <div className="wt-card" style={{ '--pad': '28px' }}>
+        <div className="wt-card" style={{ padding: 28 }}>
           <span className="wt-eyebrow" style={{ display: 'block', marginBottom: 6 }}>First-time setup</span>
           <h2 style={{ fontSize: 'var(--wt-text-md)', fontWeight: 700, color: 'var(--wt-text)',
             letterSpacing: '-0.02em', marginBottom: 4 }}>
