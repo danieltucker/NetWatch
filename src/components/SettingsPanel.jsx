@@ -49,7 +49,7 @@ const CHANNEL_VALIDATION = [
 
 // ── SettingsPanel ─────────────────────────────────────────────────────────────
 
-export function SettingsPanel({ onClose, onImportSuccess, chartYMax = 'auto', onChartYMaxChange, alertsAutoOpen = 'outage', onAlertsAutoOpenChange }) {
+export function SettingsPanel({ onClose, onImportSuccess, chartYMax = 'auto', onChartYMaxChange }) {
   const { t, isDark, themeMode, setThemeMode } = useTheme();
   const { user, changePassword } = useAuth();
   const [activeTab,        setActiveTab]        = useState('general');
@@ -396,8 +396,6 @@ export function SettingsPanel({ onClose, onImportSuccess, chartYMax = 'auto', on
               <GeneralTab
                 chartYMax={chartYMax}
                 onChartYMaxChange={onChartYMaxChange}
-                alertsAutoOpen={alertsAutoOpen}
-                onAlertsAutoOpenChange={onAlertsAutoOpenChange}
                 themeMode={themeMode}
                 setThemeMode={setThemeMode}
                 downCheckInterval={settings.down_check_interval || '30'}
@@ -528,7 +526,7 @@ const THEME_OPTIONS = [
   { value: 'dark',  label: 'Dark'  },
 ];
 
-function GeneralTab({ chartYMax, onChartYMaxChange, alertsAutoOpen, onAlertsAutoOpenChange, themeMode, setThemeMode, downCheckInterval, onDownCheckIntervalChange, t, isDark }) {
+function GeneralTab({ chartYMax, onChartYMaxChange, themeMode, setThemeMode, downCheckInterval, onDownCheckIntervalChange, t, isDark }) {
   return (
     <div className="space-y-3">
       <SettingRow
@@ -575,21 +573,6 @@ function GeneralTab({ chartYMax, onChartYMaxChange, alertsAutoOpen, onAlertsAuto
           {CHART_Y_OPTIONS.map(o => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
-        </select>
-      </SettingRow>
-
-      <SettingRow
-        title="Auto-open alerts panel"
-        description="Automatically expand the alerts panel when a new alert is detected via live updates."
-        t={t}>
-        <select
-          value={alertsAutoOpen}
-          onChange={e => onAlertsAutoOpenChange?.(e.target.value)}
-          className="text-xs wt-mono wt-input appearance-none cursor-pointer"
-          style={{ backgroundColor: t.inputBg, color: t.textSecondary, borderColor: t.cardBorder }}>
-          <option value="outage">On outage only</option>
-          <option value="both">On any alert</option>
-          <option value="never">Never</option>
         </select>
       </SettingRow>
 

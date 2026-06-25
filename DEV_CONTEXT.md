@@ -88,6 +88,9 @@ NetWatch is a self-hosted, real-time network uptime monitoring dashboard. Users 
 - Sort dropdown: kept as <select> for simplicity and accessibility; options expanded to Default/Status/Uptime/Name/Slowest
 - Controls row: ml-auto on Sort to push it to the right on wide screens
 - Search input: animates width 140→160px when active; Escape clears and blurs
-- Alerts auto-open: user-configurable in Settings → General; options: "On outage" / "On any alert" / "Never"; stored in localStorage key `nw-alerts-auto-open`; default: "On outage"
-- Alerts auto-open is frontend-only (localStorage) — no backend settings API changes needed
+- Alerts moved into Console panel (backtick toggle); AlertsBanner removed from all views; AlertsPanel.jsx is now unused
+- Bell icon no longer opens an alert panel — it opens the console instead; `alertsExpanded` state removed
+- Bell dots: up to 3 stacked colored pills (red/amber/green) by severity (outage/degraded/recovered); hover expands pills to show count using max-width CSS transition; `BellDots` component in App.jsx
+- Console alert section: pinned above command output; filter input narrows by label/type; "clear" sets `clearedAt` timestamp — only alerts with activity after that timestamp show; rolling 200-alert cap; no per-alert dismiss
+- Alerts auto-open setting removed from Settings → General (console never auto-opens)
 - GeneralTab pattern: prop-drilled from App.jsx → SettingsPanel → GeneralTab, same as chartYMax

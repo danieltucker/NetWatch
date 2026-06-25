@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 
 // ---------------------------------------------------------------------------
 // Command definitions
@@ -82,10 +82,6 @@ function pad(str, len) {
   return String(str).padEnd(len);
 }
 
-function certColor(days) {
-  return days > 30 ? '#4ade80' : days > 7 ? '#fbbf24' : '#f87171';
-}
-
 // Walk history chronologically and extract down→up incident transitions.
 function extractIncidents(history) {
   const incidents = [];
@@ -108,20 +104,124 @@ function extractIncidents(history) {
 }
 
 // ---------------------------------------------------------------------------
+// Console alert row — always on dark surface, uses console tokens
+// ---------------------------------------------------------------------------
+
+function ConsoleAlertRow({ alert }) {
+  const isActive  = !alert.resolvedAt;
+  const isOutage  = alert.type === 'outage';
+  const dotColor  = isActive
+    ? (isOutage ? 'var(--wt-down-500)' : 'var(--wt-warn-500)')
+    : 'var(--wt-up-500)';
+  const typeLabel = isOutage ? 'OUTAGE' : alert.type === 'degraded' ? 'DEGRADED' : 'RECOVERED';
+  const ts        = alert.lastOccurredAt ?? alert.startedAt;
+  const timeStr   = ts
+    ? new Date(ts).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : '—';
+
+  return (
+    <div style={{
+      display:    'flex',
+      alignItems: 'center',
+      gap:         8,
+      padding:    '3px 16px',
+      fontSize:    12,
+      fontFamily: 'var(--wt-font-mono)',
+      lineHeight:  1.5,
+    }}>
+      <span style={{
+        width:           6,
+        height:          6,
+        borderRadius:   '50%',
+        backgroundColor: dotColor,
+        flexShrink:      0,
+      }} />
+      <span style={{
+        color:         dotColor,
+        fontSize:       10,
+        fontWeight:     700,
+        letterSpacing: '0.06em',
+        width:          72,
+        flexShrink:     0,
+      }}>
+        {typeLabel}
+      </span>
+      <span style={{
+        color:        'var(--wt-console-text)',
+        flex:          1,
+        overflow:     'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace:   'nowrap',
+      }}>
+        {alert.monitorLabel}
+      </span>
+      <span style={{ color: 'var(--wt-console-muted)', fontSize: 11, flexShrink: 0 }}>
+        {timeStr}
+      </span>
+      <span style={{
+        color:         isActive ? dotColor : 'var(--wt-console-muted)',
+        fontSize:       10,
+        letterSpacing: '0.04em',
+        flexShrink:     0,
+        width:          60,
+        textAlign:     'right',
+      }}>
+        {isActive ? 'ONGOING' : 'RESOLVED'}
+      </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // ConsolePanel
 // ---------------------------------------------------------------------------
 
-export function ConsolePanel({ monitors = [], onRefresh }) {
-  const [isOpen,  setIsOpen]  = useState(false);
-  const [input,   setInput]   = useState('');
-  const [cmdHist, setCmdHist] = useState([]);
-  const [histIdx, setHistIdx] = useState(-1);
-  const [lines,   setLines]   = useState([
+export function ConsolePanel({ monitors = [], onRefresh, alerts = [], isOpen, onIsOpenChange }) {
+  const [input,       setInput]       = useState('');
+  const [cmdHist,     setCmdHist]     = useState([]);
+  const [histIdx,     setHistIdx]     = useState(-1);
+  const [lines,       setLines]       = useState([
     { type: 'info', text: 'NetWatch Console  —  type "help" for available commands' },
   ]);
+  const [alertFilter, setAlertFilter] = useState('');
+  const [clearedAt,   setClearedAt]   = useState(null);
 
-  const outputRef = useRef(null);
-  const inputRef  = useRef(null);
+  const outputRef      = useRef(null);
+  const inputRef       = useRef(null);
+  const alertFilterRef = useRef(null);
+
+  // ── Derived: filtered + sorted visible alerts ────────────────────────────
+  const visibleAlerts = useMemo(() => {
+    let list = clearedAt
+      ? alerts.filter(a => {
+          const activity = a.lastOccurredAt ?? a.startedAt;
+          return new Date(activity) > new Date(clearedAt);
+        })
+      : alerts.slice();
+
+    if (alertFilter.trim()) {
+      const q = alertFilter.toLowerCase();
+      list = list.filter(a =>
+        a.monitorLabel?.toLowerCase().includes(q) ||
+        a.type?.toLowerCase().includes(q) ||
+        (a.resolvedAt ? 'recovered' : '').includes(q)
+      );
+    }
+
+    return list
+      .sort((a, b) => {
+        if (!a.resolvedAt && b.resolvedAt)  return -1;
+        if (a.resolvedAt  && !b.resolvedAt) return  1;
+        if (!a.resolvedAt && !b.resolvedAt) {
+          const rank = { outage: 0, degraded: 1 };
+          return (rank[a.type] ?? 2) - (rank[b.type] ?? 2);
+        }
+        return new Date(b.resolvedAt) - new Date(a.resolvedAt);
+      })
+      .slice(0, 200);
+  }, [alerts, alertFilter, clearedAt]);
+
+  const activeAlertCount = alerts.filter(a => !a.resolvedAt).length;
 
   // ── Global keyboard handler ──────────────────────────────────────────────
   useEffect(() => {
@@ -130,13 +230,13 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
         const inField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName);
         if (!isOpen && inField) return;
         e.preventDefault();
-        setIsOpen(v => !v);
+        onIsOpenChange(!isOpen);
       }
-      if (e.key === 'Escape' && isOpen) setIsOpen(false);
+      if (e.key === 'Escape' && isOpen) onIsOpenChange(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isOpen]);
+  }, [isOpen, onIsOpenChange]);
 
   // ── Focus + body scroll lock ─────────────────────────────────────────────
   useEffect(() => {
@@ -218,7 +318,7 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
 
         // ── version ──────────────────────────────────────────────────────
         case 'version':
-          emit({ type: 'output', text: 'NetWatch v6.15.1 — https://github.com/danieltucker/NetWatch/releases/tag/v6.15.1' });
+          emit({ type: 'output', text: 'NetWatch v6.16.2 — https://github.com/danieltucker/NetWatch/releases/tag/v6.16.2' });
           break;
 
         // ── help ─────────────────────────────────────────────────────────
@@ -563,7 +663,6 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
             { type: 'divider' },
             { type: 'info', text: `${monitors.length} monitor(s) — history window debug` },
             ...monitors.slice(0, 15).map(m => {
-              // Full date+time (not just time-of-day) so multi-day accumulation is visible
               const fmt = ts => ts
                 ? new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
                 : '?';
@@ -603,7 +702,7 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
       fontSize:          13,
       backgroundColor: 'var(--wt-console-bg)',
       borderBottom:    '1px solid var(--wt-console-border)',
-      boxShadow:       isOpen ? '0 8px 40px rgba(0,0,0,0.7)' : 'none',
+      boxShadow:        isOpen ? '0 8px 40px rgba(0,0,0,0.7)' : 'none',
       transform:        isOpen ? 'translateY(0)' : 'translateY(-100%)',
       transition:       'transform 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
       pointerEvents:    isOpen ? 'all' : 'none',
@@ -626,6 +725,105 @@ export function ConsolePanel({ monitors = [], onRefresh }) {
           ` to close  ·  tab to complete  ·  ↑↓ history
         </span>
       </div>
+
+      {/* Alert section — only rendered when alerts exist */}
+      {alerts.length > 0 && (
+        <div style={{
+          borderBottom:    '1px solid var(--wt-console-border)',
+          flexShrink:       0,
+          maxHeight:       '38%',
+          display:         'flex',
+          flexDirection:   'column',
+          backgroundColor: 'var(--wt-console-bg)',
+        }}>
+          {/* Alert section header */}
+          <div style={{
+            display:         'flex',
+            alignItems:      'center',
+            gap:              8,
+            padding:         '4px 16px',
+            backgroundColor: 'var(--wt-console-bg-2)',
+            borderBottom:    visibleAlerts.length > 0 ? '1px solid var(--wt-console-border)' : 'none',
+            flexShrink:       0,
+          }}>
+            <span style={{ color: 'var(--wt-console-accent)', fontWeight: 700, letterSpacing: '0.12em', fontSize: 10 }}>
+              ALERTS
+            </span>
+            {activeAlertCount > 0 && (
+              <span style={{
+                fontFamily:      'var(--wt-font-mono)',
+                fontSize:         10,
+                color:           'var(--wt-console-muted)',
+                backgroundColor: 'color-mix(in oklch, var(--wt-console-accent) 12%, transparent)',
+                padding:         '1px 5px',
+                borderRadius:     999,
+              }}>
+                {activeAlertCount} active
+              </span>
+            )}
+            <div style={{ flex: 1 }} />
+            {/* Inline filter input */}
+            <input
+              ref={alertFilterRef}
+              value={alertFilter}
+              onChange={e => setAlertFilter(e.target.value)}
+              placeholder="filter…"
+              style={{
+                background:   'transparent',
+                border:       'none',
+                borderBottom: `1px solid ${alertFilter ? 'var(--wt-console-accent)' : 'var(--wt-console-border)'}`,
+                outline:      'none',
+                color:        'var(--wt-console-text)',
+                fontFamily:   'var(--wt-font-mono)',
+                fontSize:      11,
+                width:         alertFilter ? 120 : 56,
+                transition:   `width var(--wt-dur) var(--wt-ease), border-color var(--wt-dur) var(--wt-ease)`,
+                padding:      '1px 4px',
+                caretColor:   'var(--wt-console-prompt)',
+              }}
+            />
+            {/* Clear history button */}
+            <button
+              onClick={() => { setClearedAt(Date.now()); setAlertFilter(''); }}
+              style={{
+                color:         'var(--wt-console-muted)',
+                background:    'none',
+                border:        'none',
+                cursor:        'pointer',
+                fontFamily:    'var(--wt-font-mono)',
+                fontSize:       10,
+                padding:       '1px 6px',
+                borderRadius:   3,
+                letterSpacing: '0.04em',
+                transition:    `color var(--wt-dur)`,
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--wt-console-text)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--wt-console-muted)'}
+              title="Clear visible alert history"
+            >
+              clear
+            </button>
+          </div>
+
+          {/* Alert rows or cleared message */}
+          {visibleAlerts.length > 0 ? (
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              {visibleAlerts.map(a => (
+                <ConsoleAlertRow key={a.id} alert={a} />
+              ))}
+            </div>
+          ) : (
+            <div style={{
+              padding:    '5px 16px',
+              color:      'var(--wt-console-muted)',
+              fontSize:    11,
+              fontFamily: 'var(--wt-font-mono)',
+            }}>
+              — cleared · new alerts will appear here
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Output area */}
       <div ref={outputRef} style={{

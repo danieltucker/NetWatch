@@ -25,7 +25,6 @@ import { StatusDot }           from './components/StatusIndicators';
 import { ModuleCard }          from './components/ModuleCard';
 import { MonitorForm }         from './components/MonitorForm';
 import { ModuleInstanceForm }  from './components/ModuleInstanceForm';
-import { AlertsBanner }        from './components/AlertsBanner';
 import { IncidentsPage }       from './components/IncidentsPage';
 import { MaintenancePage }     from './components/MaintenancePage';
 import { ReportsPage }         from './components/ReportsPage';
@@ -82,6 +81,63 @@ const SORT_OPTIONS = [
   { label: 'Slowest', value: 'ping'    },
 ];
 
+// ── Bell dot indicator ────────────────────────────────────────────────────────
+
+function BellDots({ outageCount, degradedCount, recoveredCount, expanded }) {
+  const dots = [
+    { count: outageCount,    color: 'var(--wt-down-500)' },
+    { count: degradedCount,  color: 'var(--wt-warn-500)' },
+    { count: recoveredCount, color: 'var(--wt-up-500)'   },
+  ].filter(d => d.count > 0);
+
+  if (!dots.length) return null;
+
+  return (
+    <div style={{
+      position:       'absolute',
+      top:            -6,
+      right:          -6,
+      display:        'flex',
+      flexDirection:  'column',
+      alignItems:     'flex-end',
+      gap:             2,
+      pointerEvents:  'none',
+    }}>
+      {dots.map((dot) => (
+        <div
+          key={dot.color}
+          style={{
+            height:          8,
+            maxWidth:        expanded ? 36 : 8,
+            minWidth:        8,
+            borderRadius:    999,
+            backgroundColor: dot.color,
+            overflow:        'hidden',
+            display:         'flex',
+            alignItems:      'center',
+            justifyContent:  'center',
+            padding:         expanded ? '0 4px' : '0',
+            transition:      `max-width var(--wt-dur) var(--wt-ease), padding var(--wt-dur) var(--wt-ease)`,
+          }}
+        >
+          <span style={{
+            color:      '#fff',
+            fontSize:    8,
+            fontFamily: 'var(--wt-font-mono)',
+            fontWeight:  700,
+            lineHeight:  1,
+            whiteSpace: 'nowrap',
+            opacity:     expanded ? 1 : 0,
+            transition: `opacity var(--wt-dur) var(--wt-ease)`,
+          }}>
+            {dot.count}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -124,16 +180,7 @@ export default function App() {
   const { monitors, loading, error, sseConnected, addMonitor, updateMonitor, deleteMonitor, refresh } =
     useMonitors(historyWindow, historyRange);
 
-  const [alertsAutoOpen, setAlertsAutoOpen] = useState(() => {
-    try { return localStorage.getItem('nw-alerts-auto-open') || 'outage'; }
-    catch { return 'outage'; }
-  });
-
-  const { alerts, dismiss: dismissAlert, dismissAll } = useAlerts((alert) => {
-    if (alertsAutoOpen === 'never') return;
-    if (alertsAutoOpen === 'outage' && alert.type !== 'outage') return;
-    setAlertsExpanded(true);
-  });
+  const { alerts } = useAlerts();
   const { instances, addInstance, updateInstance, deleteInstance } = useModuleInstances();
 
   const [showForm,       setShowForm]       = useState(false);
@@ -149,7 +196,8 @@ export default function App() {
   const [tagFilter,      setTagFilter]      = useState([]);
   const [searchQuery,    setSearchQuery]    = useState('');
   const [statusFilter,   setStatusFilter]   = useState('all');
-  const [alertsExpanded,          setAlertsExpanded]          = useState(false);
+  const [consoleOpen,             setConsoleOpen]             = useState(false);
+  const [bellHovered,             setBellHovered]             = useState(false);
   const [view,                    setView]                    = useState('monitors'); // 'monitors' | 'incidents' | 'maintenance'
   const [viewMode,                setViewMode]                = useState('grid');     // 'grid' | 'list'
   const [groupByEnabled,          setGroupByEnabled]          = useState(() => {
@@ -298,8 +346,10 @@ export default function App() {
     }
   };
 
-  // Active = unresolved and not dismissed
-  const ongoingCount = alerts.filter(a => !a.resolvedAt && !a.dismissedAt).length;
+  // Bell dot counts by severity
+  const outageCount   = alerts.filter(a => a.type === 'outage'   && !a.resolvedAt).length;
+  const degradedCount = alerts.filter(a => a.type === 'degraded' && !a.resolvedAt).length;
+  const recoveredCount = alerts.filter(a => !!a.resolvedAt).length;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -359,7 +409,13 @@ export default function App() {
     <div className="app">
 
       {/* ── Console (always mounted, toggled with `) ─────────────────────────── */}
-      <ConsolePanel monitors={monitors} onRefresh={refresh} />
+      <ConsolePanel
+        monitors={monitors}
+        onRefresh={refresh}
+        alerts={alerts}
+        isOpen={consoleOpen}
+        onIsOpenChange={setConsoleOpen}
+      />
 
       {/* ── Page-level error toast ───────────────────────────────────────────── */}
       {pageError && (
@@ -381,7 +437,7 @@ export default function App() {
         <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em', color: 'var(--wt-text)' }}>
           Net<span style={{ color: 'var(--nw-ink)' }}>Watch</span>
         </span>
-        <a href="https://github.com/danieltucker/NetWatch/releases/tag/v6.16.1" target="_blank" rel="noopener noreferrer" className="wt-chip wt-chip--plain" style={{ textDecoration: 'none' }}>v6.16.1</a>
+        <a href="https://github.com/danieltucker/NetWatch/releases/tag/v6.16.2" target="_blank" rel="noopener noreferrer" className="wt-chip wt-chip--plain" style={{ textDecoration: 'none' }}>v6.16.2</a>
 
         <div className="flex items-center gap-2" style={{ marginLeft: 'auto' }}>
           {/* live / offline indicator */}
@@ -413,13 +469,14 @@ export default function App() {
 
           {/* ghost icon buttons — desktop */}
           <div className="hidden wide:flex items-center gap-1">
-            <button onClick={() => setAlertsExpanded(p => !p)} className="wt-btn wt-btn--ghost wt-btn--sm relative" title="Alerts"
-              style={ongoingCount > 0 ? { color: 'var(--wt-down-600)' } : undefined}>
+            <button
+              onClick={() => setConsoleOpen(true)}
+              onMouseEnter={() => setBellHovered(true)}
+              onMouseLeave={() => setBellHovered(false)}
+              className="wt-btn wt-btn--ghost wt-btn--sm relative"
+              title="Alerts (open console)">
               <Bell size={16} />
-              {ongoingCount > 0 && (
-                <span className="wt-mono absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: 'var(--wt-down-500)', color: '#fff', fontSize: 9, fontWeight: 700 }}>{ongoingCount}</span>
-              )}
+              <BellDots outageCount={outageCount} degradedCount={degradedCount} recoveredCount={recoveredCount} expanded={bellHovered} />
             </button>
             <button onClick={() => setEmbedMonitor(undefined)} className="wt-btn wt-btn--ghost wt-btn--sm" title="Embed dashboard"><Code size={16} /></button>
             <button onClick={() => setShowSettings(true)} className="wt-btn wt-btn--ghost wt-btn--sm" title="Settings"><Settings size={16} /></button>
@@ -429,13 +486,14 @@ export default function App() {
           <button onClick={openAdd} className="hidden wide:inline-flex wt-btn wt-btn--primary"><Plus size={15} />Add monitor</button>
 
           {/* mobile: alerts + hamburger */}
-          <button onClick={() => setAlertsExpanded(p => !p)} className="wide:hidden wt-btn wt-btn--ghost wt-btn--sm relative" title="Alerts"
-            style={ongoingCount > 0 ? { color: 'var(--wt-down-600)' } : undefined}>
+          <button
+            onClick={() => setConsoleOpen(true)}
+            onMouseEnter={() => setBellHovered(true)}
+            onMouseLeave={() => setBellHovered(false)}
+            className="wide:hidden wt-btn wt-btn--ghost wt-btn--sm relative"
+            title="Alerts (open console)">
             <Bell size={16} />
-            {ongoingCount > 0 && (
-              <span className="wt-mono absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: 'var(--wt-down-500)', color: '#fff', fontSize: 9, fontWeight: 700 }}>{ongoingCount}</span>
-            )}
+            <BellDots outageCount={outageCount} degradedCount={degradedCount} recoveredCount={recoveredCount} expanded={bellHovered} />
           </button>
           <button onClick={() => setMobileMenuOpen(p => !p)} className="wide:hidden wt-btn wt-btn--ghost wt-btn--sm" title="Menu">
             {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
@@ -534,15 +592,6 @@ export default function App() {
                 </div>
               </div>
             </div>
-            <div className="px-6 pt-5">
-              <AlertsBanner
-                alerts={alerts}
-                onDismiss={dismissAlert}
-                onDismissAll={dismissAll}
-                expanded={alertsExpanded}
-                onToggle={() => setAlertsExpanded(p => !p)}
-              />
-            </div>
             <div className="px-6 py-5">
               <IncidentsPage
                 alerts={alerts}
@@ -567,15 +616,6 @@ export default function App() {
                     : 'No active windows'}
                 </div>
               </div>
-            </div>
-            <div className="px-6 pt-5">
-              <AlertsBanner
-                alerts={alerts}
-                onDismiss={dismissAlert}
-                onDismissAll={dismissAll}
-                expanded={alertsExpanded}
-                onToggle={() => setAlertsExpanded(p => !p)}
-              />
             </div>
             <div className="px-6 py-5">
               <MaintenancePage monitors={monitors} />
@@ -615,15 +655,6 @@ export default function App() {
                   <RefreshCw size={14} />
                 </button>
               </div>
-            </div>
-            <div className="px-6 pt-5">
-              <AlertsBanner
-                alerts={alerts}
-                onDismiss={dismissAlert}
-                onDismissAll={dismissAll}
-                expanded={alertsExpanded}
-                onToggle={() => setAlertsExpanded(p => !p)}
-              />
             </div>
 
             {/* Summary tiles */}
@@ -754,11 +785,6 @@ export default function App() {
           onImportSuccess={refresh}
           chartYMax={chartYMax}
           onChartYMaxChange={handleChartYMaxChange}
-          alertsAutoOpen={alertsAutoOpen}
-          onAlertsAutoOpenChange={(val) => {
-            setAlertsAutoOpen(val);
-            try { localStorage.setItem('nw-alerts-auto-open', val); } catch {}
-          }}
         />
       )}
 
