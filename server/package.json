@@ -13,7 +13,7 @@
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "got": "^13.0.0",
-    "nodemailer": "^9.0.1",
+    "nodemailer": "^9.1.1",
     "ssl-checker": "^2.0.10"
   }
 }
